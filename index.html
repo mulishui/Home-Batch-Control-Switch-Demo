@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Batch Control 切换 Demo · 框架草稿</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:"SF Pro Text","SF Pro Display",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+    background:#f5f7fa;color:#1c1d21;overflow:hidden;
+  }
+  /* 非移动端：整屏居中，内容不够放就靠 JS 整体缩放塞进一屏 */
+  .stage{display:flex;justify-content:center;align-items:center;height:100vh;padding:16px;overflow:hidden}
+  .stage-fit{display:flex;gap:24px;align-items:flex-start;flex-wrap:nowrap;transform-origin:center center}
+
+  .phone-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;flex:0 0 auto}
+
+  /* 手机尺寸按 iPhone 17 Pro 逻辑分辨率模拟（402 x 874pt），素材按 @2x 导出 */
+  .phone{
+    width:402px;height:874px;border-radius:55px;background:#f5f7fa;
+    box-shadow:0 18px 44px rgba(20,22,30,.16),0 0 0 9px #1c1d21,0 0 0 10px #35373f;
+    overflow:hidden;position:relative;
+    user-select:none;-webkit-user-select:none;
+    /* 顶部安全区：加到主屏幕独立运行时用真实 env()，桌面预览时退回模拟的 59px（iPhone 17 Pro 灵动岛高度） */
+    --safe-top:max(59px, env(safe-area-inset-top, 0px));
+    --topbar-h:calc(var(--safe-top) + 64px);
+  }
+  .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:#f5f7fa}
+  .screen::-webkit-scrollbar{display:none}
+
+  /* 头部背景图：从屏幕最顶端开始铺（叠在状态栏下一层），随内容一起滚动 */
+  .header-bg{
+    position:absolute;top:0;left:0;width:100%;height:364px;
+    background:url(assets/header-bg@2x.png) top/100% auto no-repeat;
+    z-index:0;pointer-events:none;
+  }
+
+  /* 头像 + 顶部菜单：固定顶部，背景透明，露出下面的 header-bg */
+  .top-bar{
+    position:absolute;top:0;left:0;right:0;z-index:10;height:var(--topbar-h);
+    padding:0 16px;padding-top:var(--safe-top);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .avatar{width:40px;height:40px;border-radius:50%;background:#d9d9e0;flex:0 0 auto}
+  .top-actions{display:flex;gap:8px}
+  .icon-btn{
+    width:40px;height:40px;border-radius:50%;border:none;
+    background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;
+    font-size:16px;color:#1c1d21;
+  }
+
+  .scroll-content{position:relative;z-index:1;padding-top:var(--topbar-h)}
+
+  .page-title{padding:4px 16px 14px;font-size:28px;font-weight:700;color:#1c1d21;display:flex;align-items:center;gap:4px}
+  .page-title svg{opacity:.5}
+  .banner{
+    margin:0 16px 16px;padding:11px 14px;border-radius:14px;font-size:13px;color:#3a3d44;
+    background:rgba(255,255,255,.55);display:flex;align-items:center;gap:8px;
+  }
+
+  /* Batch Control tab 行：占位版——先用文字胶囊，左右可滑动，真素材到了再替换 */
+  .tab-row{
+    position:sticky;top:var(--topbar-h);z-index:5;
+    display:flex;gap:10px;padding:10px 16px;overflow-x:auto;scroll-snap-type:x proximity;
+    background:rgba(245,247,250,.72);
+    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  }
+  .tab-row::-webkit-scrollbar{display:none}
+  .tab-pill{
+    flex:0 0 auto;scroll-snap-align:start;border:none;cursor:pointer;
+    padding:9px 16px;border-radius:20px;background:#fff;color:#1c1d21;
+    font-size:14px;font-weight:600;white-space:nowrap;
+  }
+  .tab-pill.active{background:#0a84ff;color:#fff}
+
+  .device-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 16px 170px}
+  .device-card{background:#e4e8f0;border-radius:16px;padding:14px;height:120px;display:flex;flex-direction:column;justify-content:flex-end}
+  .device-card .name{font-size:15px;font-weight:600;color:#1c1d21}
+  .device-card .loc{font-size:12px;color:#8a8d94}
+
+  /* 底部 Tab 页签：占位版，固定吸底，最上层 */
+  .tab-bar{
+    position:absolute;left:0;right:0;bottom:0;z-index:20;
+    display:flex;justify-content:space-around;align-items:center;
+    padding:8px 0 calc(env(safe-area-inset-bottom, 0px) + 6px);
+    background:rgba(255,255,255,.9);
+    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-top:1px solid rgba(0,0,0,.06);
+  }
+  .tab-bar .item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:#8a8d94}
+  .tab-bar .item.active{color:#0a84ff}
+
+  .hint{text-align:center;font-size:12px;color:#a8abb3;max-width:340px}
+
+  @media (max-width:600px){
+    .stage{padding:0;height:100dvh}
+    .stage-fit{width:100%;height:100%;gap:0;transform:none !important}
+    .phone-wrap{width:100%;height:100%;gap:0}
+    .hint{display:none}
+    .phone{
+      width:100%;height:100dvh;border-radius:0;box-shadow:none;background:#f5f7fa;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+ <div class="stage-fit" id="stageFit">
+  <div class="phone-wrap">
+    <div class="hint">框架草稿：验证"头像菜单固定 / header 背景图随滚动 / Batch Control tab 吸顶 / 列表滚动 / 底部吸底"的层级关系，图标与卡片都是占位</div>
+    <div class="phone">
+      <div class="screen" id="screen">
+        <div class="header-bg"></div>
+        <div class="scroll-content">
+          <div class="page-title">My Home <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1c1d21" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+          <div class="banner">🔌 Behind TV2 (Plug) will turn on at 7:00PM</div>
+
+          <div class="tab-row" id="tabRow">
+            <button class="tab-pill active" data-cat="favorites">♡ Favorites</button>
+            <button class="tab-pill" data-cat="all">▦ All Devices</button>
+            <button class="tab-pill" data-cat="security">🎥 Security</button>
+            <button class="tab-pill" data-cat="lighting">💡 Lighting</button>
+            <button class="tab-pill" data-cat="others">🔌 Others</button>
+          </div>
+
+          <div class="device-grid" id="deviceGrid">
+            <div class="device-card"><div class="name">Device Name</div><div class="loc">Location Info</div></div>
+            <div class="device-card"><div class="name">Device Name</div><div class="loc">Location Info</div></div>
+            <div class="device-card"><div class="name">Device Name</div><div class="loc">Location Info</div></div>
+            <div class="device-card"><div class="name">Device Name</div><div class="loc">Location Info</div></div>
+            <div class="device-card"><div class="name">Device Name</div><div class="loc">Location Info</div></div>
+            <div class="device-card"><div class="name">Device Name</div><div class="loc">Location Info</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="top-bar">
+        <div class="avatar"></div>
+        <div class="top-actions">
+          <button class="icon-btn">🔔</button>
+          <button class="icon-btn">＋</button>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <div class="item active"><span>⌂</span><span>Home</span></div>
+        <div class="item"><span>◎</span><span>Cameras</span></div>
+        <div class="item"><span>◍</span><span>Smart</span></div>
+        <div class="item"><span>▢</span><span>Shop</span></div>
+        <div class="item"><span>✦</span><span></span></div>
+      </div>
+    </div>
+  </div>
+ </div>
+</div>
+
+<script>
+  var tabRow = document.getElementById('tabRow');
+  tabRow.addEventListener('click', function(e){
+    var btn = e.target.closest('.tab-pill');
+    if(!btn) return;
+    tabRow.querySelectorAll('.tab-pill').forEach(function(p){ p.classList.remove('active'); });
+    btn.classList.add('active');
+    btn.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
+    // 列表筛选逻辑等真实分类素材到了再接
+  });
+
+  var stageFit = document.getElementById('stageFit');
+  function fitStage(){
+    if(window.matchMedia('(max-width:600px)').matches){
+      stageFit.style.transform = '';
+      return;
+    }
+    stageFit.style.transform = 'scale(1)';
+    var rect = stageFit.getBoundingClientRect();
+    var scale = Math.min(1, (window.innerWidth - 32) / rect.width, (window.innerHeight - 32) / rect.height);
+    stageFit.style.transform = 'scale(' + scale + ')';
+  }
+  window.addEventListener('resize', fitStage);
+  fitStage();
+</script>
+</body>
+</html>
