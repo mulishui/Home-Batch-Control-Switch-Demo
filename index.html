@@ -65,15 +65,17 @@
   /* header-bg 是常显的底图（z-index:2），不像 header-fade-bg 那样跟滚动淡入淡出——
      所以 page-title/banner 必须给一个比它更高的 z-index（3），不然按 CSS 规则，
      定位元素（header-bg）天生会盖在非定位的静态内容（page-title/banner）上面，
-     常显的底图会把文字永久挡住。给它们 z-index:3 之后，header-fade-bg（z-index:4）
-     仍然比它们高，滚动吸顶时渐变层照常能盖住它们，不受影响。
-     同样的道理也适用于下面的 .pager（设备列表）：header-bg/header-fade-bg 是
-     position:fixed 且带 z-index 的定位元素，只要列表本身不定位，不管 DOM 顺序、
-     不管 header-bg/header-fade-bg 的 z-index 数值多低，列表永远会被判定"先画"而被
-     盖在它们下面——往下滑到设备卡片的屏幕位置穿过 header-bg/header-fade-bg 常驻的
-     那段高度时，卡片就会被这两层背景图盖住。所以 .pager 也必须给 position:relative
-     + 比 header-fade-bg（4）更高的 z-index（见下方 .pager），列表才能稳定盖在这两层
-     常驻背景之上，只在需要的时候被更上层的 tab-row（吸顶）和 top-bar 盖住。 */
+     常显的底图会把文字永久挡住。
+     同样的道理也适用于下面的 .pager（设备列表）：只要列表本身不定位，不管 DOM
+     顺序，往下滑到设备卡片的屏幕位置穿过 header-bg 常驻的那段高度时，卡片就会被
+     这层底图盖住，所以 .pager 也必须给 position:relative + 比 header-bg（2）更高
+     的 z-index（见下方 .pager）。
+     但 .pager 不能给得比 header-fade-bg（4）还高（之前给到 5 时踩过这个坑）：
+     header-fade-bg 跟随滚动淡入到 100%、盖住吸顶的 tab-row 缝隙后面那段高度，就是
+     为了在这段高度里把滚上来的列表内容遮住——如果 .pager 比它高，列表反而会画在
+     渐变层上面，从 tab-pill 之间的透明缝隙里透出来，渐变等于白做了。所以 .pager 的
+     z-index 必须卡在 header-bg（2）和 header-fade-bg（4）之间，这里用 3，和
+     page-title/banner 同级即可——它们在滚动时机上互不重叠，不会因为同值打架。 */
   .page-title{position:relative;z-index:3;padding:4px var(--page-margin) 14px;font-size:28px;font-weight:700;color:#1D2529;display:flex;align-items:center;gap:4px}
   .page-title svg{width:24px;height:24px}
   .banner{
@@ -145,11 +147,13 @@
   /* 分类列表：横向分页容器，和 banner 轮播同一套做法——
      不依赖原生滚动/scroll-snap，而是用 translateX + transition 直接控制位移，
      手势只负责"跟手拖拽 + 松手判定翻不翻页"，动画节奏完全由自己掌控，不受浏览器滚动惯性影响 */
-  /* position:relative + z-index:5：必须比 header-fade-bg（4）高，列表（含里面的
-     device-grid/shortcut-row/empty-state）才能在滚动时稳定盖住那两层常驻背景，
-     不被"非定位内容天生垫底"的规则坑了（详见上面 header-bg 的注释）。
+  /* position:relative + z-index:3：必须比 header-bg（2）高，列表（含里面的
+     device-grid/shortcut-row/empty-state）才不会被"非定位内容天生垫底"的规则坑了
+     （详见上面 header-bg 的注释），滚动时能稳定盖住常显的 header-bg 底图。
+     但不能比 header-fade-bg（4）高，否则列表会画到渐变层上面，从 tab-pill 之间的
+     透明缝隙里透出来，把 header-fade-bg 的遮挡效果顶穿（详见上面的注释）。
      同时要比 tab-row（6）低，吸顶后的 BC 行才能继续盖住往上滚的列表内容。 */
-  .pager{position:relative;z-index:5;overflow:hidden;touch-action:pan-y}
+  .pager{position:relative;z-index:3;overflow:hidden;touch-action:pan-y}
   /* align-items 必须显式设成 flex-start：默认 stretch 会把矮页面的 .pager-page 实际渲染高度拉到和最高页面一样，
      导致后面 JS 量 scrollHeight 量到的永远是"拉伸后"的高度（等于内容最多的那个 tab），不是该页自己的真实内容高度 */
   .pager-track{display:flex;align-items:flex-start;will-change:transform}
@@ -416,45 +420,6 @@
   }
   updateFadeLayout();
   screenEl.addEventListener('scroll', updateFadeOpacity, {passive:true});
-
-  // 临时调试面板：把关键图层的实测位置/z-index/opacity 直接打在屏幕左上角，
-  // 排查"图层顺序"问题用，截图时这些数字会一起拍进去，不用再靠肉眼猜。
-  // 排查完确认没问题后应该删掉这一段。
-  (function(){
-    var panel = document.createElement('div');
-    panel.id = 'debugPanel';
-    panel.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.78);color:#0f0;font:10px/1.4 monospace;padding:6px 8px;border-radius:6px;white-space:pre;pointer-events:none;max-width:90vw;';
-    document.body.appendChild(panel);
-    function rectOf(el){
-      var r = el.getBoundingClientRect();
-      var cs = getComputedStyle(el);
-      return 'top='+r.top.toFixed(0)+' bottom='+r.bottom.toFixed(0)+' left='+r.left.toFixed(0)+' z='+cs.zIndex+' pos='+cs.position+' op='+cs.opacity;
-    }
-    function render(){
-      var lines = [
-        'scrollTop='+screenEl.scrollTop.toFixed(0),
-        'headerBg:      '+rectOf(headerBg2),
-        'headerFadeBg:  '+rectOf(headerFadeBg),
-        'topBar:        '+rectOf(topBar),
-        'pageTitle:     '+rectOf(pageTitleEl),
-        'banner:        '+rectOf(bannerEl),
-        'tabRow:        '+rectOf(tabRow),
-        'pager:         '+rectOf(pager),
-        'deviceGrid:    '+(activeTail() ? rectOf(activeTail()) : 'n/a')
-      ];
-      panel.textContent = lines.join('\n');
-    }
-    var headerBg2 = document.getElementById('headerBg');
-    var pageTitleEl = document.querySelector('.page-title');
-    var bannerEl = document.querySelector('.banner');
-    function activeTail(){
-      var activePage = pagerTrack.children[pagerIdx];
-      return activePage ? activePage.querySelector('.device-grid, .empty-state') : null;
-    }
-    render();
-    screenEl.addEventListener('scroll', render, {passive:true});
-    window.addEventListener('resize', render);
-  })();
 
   // 拖拽/触摸：跟手滑动，松手按位移量+速度判定翻不翻页，和常见 banner 轮播一个套路
   var dragging = false, dragStartX = 0, dragStartTime = 0, dragBaseX = 0, dragDeltaX = 0;
