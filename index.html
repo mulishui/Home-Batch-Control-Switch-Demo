@@ -24,29 +24,34 @@
     width:402px;height:874px;border-radius:55px;background:#f5f7fa;
     box-shadow:0 18px 44px rgba(20,22,30,.16),0 0 0 9px #1c1d21,0 0 0 10px #35373f;
     overflow:hidden;position:relative;
+    /* 给 position:fixed 的子元素（header-fade-bg）建立一个定位基准：不加这个，fixed 元素会
+       以外层桌面预览缩放容器 #stageFit（甚至是真实视口）为基准，宽度/位置就对不上手机屏幕了 */
+    transform:translateZ(0);
     user-select:none;-webkit-user-select:none;
     /* 顶部安全区：加到主屏幕独立运行时用真实 env()，桌面预览时退回模拟的 59px（iPhone 17 Pro 灵动岛高度） */
     --safe-top:max(59px, env(safe-area-inset-top, 0px));
     --topbar-h:calc(var(--safe-top) + 64px);
     --page-margin:16px;
+    --screen-h:874px; /* .screen 的实际高度：桌面预览是固定 874px，移动端用 100dvh 覆盖（见下方 media query） */
+    --tabrow-h:68px; /* .tab-pill 高度 48px + .tab-row 上下 padding 各 10px */
+    --shortcutrow-h:72px; /* .shortcut-row img 高度 64px + 上 6px/下 2px padding */
   }
   .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:#f5f7fa}
   .screen::-webkit-scrollbar{display:none}
 
-  /* 头部背景图：从屏幕最顶端开始铺（叠在状态栏下一层），随内容一起滚动 */
-  .header-bg{
-    position:absolute;top:0;left:0;width:100%;height:364px;
-    background:url(assets/header-bg@2x.png) top/100% auto no-repeat;
-    z-index:0;pointer-events:none;
-  }
-
-  /* 头像 + 顶部菜单：固定顶部，背景透明，露出下面的 header-bg */
+  /* 头像 + 顶部菜单：固定顶部，背景透明，露出下面 .screen 的纯色底色 */
   .top-bar{
     position:absolute;top:0;left:0;right:0;z-index:10;height:var(--topbar-h);
     padding:0 16px;padding-top:var(--safe-top);
     display:flex;align-items:center;justify-content:space-between;
   }
-  .avatar{width:40px;height:40px;border-radius:50%;background:#d9d9e0;flex:0 0 auto}
+  /* 白色描边要求是"outside"（往外扩，不吃头像本身的圆形区域）：border 会占用盒子自身空间、
+     又会被 border-radius 裁切得不均匀，outline 则不跟随圆角走样——用 box-shadow 的
+     0 模糊 + 2px 扩散来模拟 Figma 的 outside stroke，天然贴合圆角且不影响头像本身的布局尺寸 */
+  .avatar{
+    width:40px;height:40px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 2px #fff;
+    background:#d9d9e0 url(assets/Profile_Picture.png) center/cover no-repeat;
+  }
   .top-actions{display:flex;gap:8px}
   .icon-btn{
     width:40px;height:40px;border-radius:50%;border:none;
@@ -57,30 +62,70 @@
 
   .scroll-content{position:relative;z-index:1;padding-top:var(--topbar-h)}
 
-  .page-title{padding:4px var(--page-margin) 14px;font-size:28px;font-weight:700;color:#1D2529;display:flex;align-items:center;gap:4px}
+  /* header-bg 是常显的底图（z-index:2），不像 header-fade-bg 那样跟滚动淡入淡出——
+     所以 page-title/banner 必须给一个比它更高的 z-index（3），不然按 CSS 规则，
+     定位元素（header-bg）天生会盖在非定位的静态内容（page-title/banner）上面，
+     常显的底图会把文字永久挡住。给它们 z-index:3 之后，header-fade-bg（z-index:4）
+     仍然比它们高，滚动吸顶时渐变层照常能盖住它们，不受影响。
+     同样的道理也适用于下面的 .pager（设备列表）：header-bg/header-fade-bg 是
+     position:fixed 且带 z-index 的定位元素，只要列表本身不定位，不管 DOM 顺序、
+     不管 header-bg/header-fade-bg 的 z-index 数值多低，列表永远会被判定"先画"而被
+     盖在它们下面——往下滑到设备卡片的屏幕位置穿过 header-bg/header-fade-bg 常驻的
+     那段高度时，卡片就会被这两层背景图盖住。所以 .pager 也必须给 position:relative
+     + 比 header-fade-bg（4）更高的 z-index（见下方 .pager），列表才能稳定盖在这两层
+     常驻背景之上，只在需要的时候被更上层的 tab-row（吸顶）和 top-bar 盖住。 */
+  .page-title{position:relative;z-index:3;padding:4px var(--page-margin) 14px;font-size:28px;font-weight:700;color:#1D2529;display:flex;align-items:center;gap:4px}
   .page-title svg{width:24px;height:24px}
   .banner{
+    position:relative;z-index:3;
     margin:0 var(--page-margin) 16px;padding:11px 14px;border-radius:14px;font-size:13px;color:#3a3d44;
     background:rgba(255,255,255,.55);display:flex;align-items:center;gap:8px;
   }
 
-  /* 顶部栏+BC tab 共用的渐变背景：固定在屏幕顶部不随内容滚动，透明度随滚动位置变化——
-     一开始（大标题区）全透明，露出下面的 header-bg 大图；"My Home"随内容往上滚、
-     逐渐贴近头像栏时开始淡入，滚到 BC tab 完全吸顶时正好淡到 100%，取代 tab-row 原来自己的白底模糊。
-     必须塞在 .scroll-content 内部（而不是和 .screen 平级）：.tab-row 的 z-index 只在
-     .scroll-content 自己的层叠上下文里起作用，放外面哪怕 z-index 再高也会整块盖住 tab-row。
-     用 height:0 的 sticky 包一层，不占文档流空间，只让内部的实际背景块跟着贴顶。 */
-  .header-fade-sticky{position:sticky;top:0;height:0;z-index:4}
-  .header-fade-bg{
-    position:absolute;top:0;left:0;right:0;
-    background:linear-gradient(to bottom, #A9C6EA 0%, #D6E6F6 55%, #F5F7FA 100%);
-    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
-    opacity:0;pointer-events:none;
+  /* 头部背景图（assets/header-bg@2x.png）：最底层、常显的背景，和 header-fade-bg
+     （跟随滚动淡入淡出的渐变叠加层）是两个独立的东西——它不跟随滚动进度变化，
+     一直是完全可见的，所以这里不写 opacity，也不在 JS 里改它的 opacity。
+     position:fixed 定位基准同样是 .phone（见上面 .phone 的 transform），不随
+     列表滚动产生位移。宽度 100% 自动填满，高度写死成素材本身的设计高度（图片
+     @2x 导出，728px / 2 = 364px），这是真实资源的固有尺寸，不是靠猜的占位数字。
+     z-index 给全场最低的 2，保证它在 page-title/banner（3）和 header-fade-bg（4）
+     之下，是名副其实的最底层。 */
+  .header-bg{
+    position:fixed;top:0;left:0;right:0;z-index:2;height:364px;
+    background:url(assets/header-bg@2x.png) top/100% auto no-repeat;
+    pointer-events:none;
   }
 
-  /* Batch Control tab 行：占位版——先用文字胶囊，左右可滑动，真素材到了再替换 */
+  /* 顶部栏+BC tab 共用的渐变背景：宽度填满，高度 = 头像栏+BC 的实际渲染高度（JS 量出来
+     再写进 style.height，不写死数字，换真实图标/文案导致这两者变高变矮时能跟着对），
+     位置常驻屏幕顶部，不随列表滚动产生任何位移——必须用 position:fixed（相对 .phone
+     定位，见上面 .phone 的 transform）而不是 sticky：sticky 在没滚到阈值之前还是按
+     文档流原位置走，会跟着内容一起往上移，做不到"从一开始就贴死在顶部"。
+     渐变本身有两层独立的透明度叠加：
+     1) 色块从上到下自带颜色渐变：AECDED → C2D9F0（0%~86%，两个色值很接近，看起来偏实色是正常的）。
+     2) 最后 14% 的高度要整体淡出到全透明——这里不能只改 background 颜色的 alpha：
+        backdrop-filter 的模糊是独立叠加在颜色上面的一层效果，只让颜色透明度归零，
+        模糊本身还是会直接截断在盒子边缘，看起来就是一条硬边（之前的 bug）。
+        改用 mask-image 对整个元素（颜色+模糊）一起做透明度淡出，这样模糊和颜色才会
+        一起慢慢消失，而不是颜色淡出了、模糊还留着一条硬边。
+     3) 整个图层作为一个整体的 opacity，由 JS 跟着 .screen 的 scrollTop 算：刚打开页面
+        （scrollTop=0）时整层是 0%，滚到 BC 吸顶的那一刻整层淡到 100%，之后保持 100%
+        不再变化——用 updateFadeOpacity() 实现，见下方脚本。
+     必须塞在 .scroll-content 内部（而不是和 .screen 平级）：.tab-row 的 z-index 只在
+     .scroll-content 自己的层叠上下文里起作用，放外面哪怕 z-index 再高也会整块盖住 tab-row。 */
+  .header-fade-bg{
+    position:fixed;top:0;left:0;right:0;z-index:4;opacity:0;
+    background:linear-gradient(to bottom, #AECDED 0%, #C2D9F0 86%, #C2D9F0 100%);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 86%, transparent 100%);
+    mask-image:linear-gradient(to bottom, #000 0%, #000 86%, transparent 100%);
+    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+    pointer-events:none;
+  }
+
+  /* Batch Control tab 行：占位版——先用文字胶囊，左右可滑动，真素材到了再替换；
+     自己不再带白底模糊，吸顶后露出来的是 header-fade-bg 淡到 100% 的那层渐变 */
   .tab-row{
-    position:sticky;top:var(--topbar-h);z-index:5;
+    position:sticky;top:var(--topbar-h);z-index:6;
     display:flex;gap:10px;padding:10px var(--page-margin);overflow-x:auto;scroll-snap-type:x proximity;
     scroll-padding:10px var(--page-margin);
   }
@@ -100,8 +145,14 @@
   /* 分类列表：横向分页容器，和 banner 轮播同一套做法——
      不依赖原生滚动/scroll-snap，而是用 translateX + transition 直接控制位移，
      手势只负责"跟手拖拽 + 松手判定翻不翻页"，动画节奏完全由自己掌控，不受浏览器滚动惯性影响 */
-  .pager{overflow:hidden;touch-action:pan-y}
-  .pager-track{display:flex;will-change:transform}
+  /* position:relative + z-index:5：必须比 header-fade-bg（4）高，列表（含里面的
+     device-grid/shortcut-row/empty-state）才能在滚动时稳定盖住那两层常驻背景，
+     不被"非定位内容天生垫底"的规则坑了（详见上面 header-bg 的注释）。
+     同时要比 tab-row（6）低，吸顶后的 BC 行才能继续盖住往上滚的列表内容。 */
+  .pager{position:relative;z-index:5;overflow:hidden;touch-action:pan-y}
+  /* align-items 必须显式设成 flex-start：默认 stretch 会把矮页面的 .pager-page 实际渲染高度拉到和最高页面一样，
+     导致后面 JS 量 scrollHeight 量到的永远是"拉伸后"的高度（等于内容最多的那个 tab），不是该页自己的真实内容高度 */
+  .pager-track{display:flex;align-items:flex-start;will-change:transform}
   .pager-page{flex:0 0 100%;min-width:100%}
 
   /* Favorites 页专属：Shortcuts 横向滚动行，占位用一张截图整体顶替，真素材到了再换成逐项卡片 */
@@ -114,11 +165,22 @@
   .shortcut-row::-webkit-scrollbar{display:none}
   .shortcut-row img{height:64px;display:block}
 
-  .device-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--page-margin) 170px}
-  .device-card{background:#e4e8f0;border-radius:16px;padding:14px;height:120px;display:flex;flex-direction:column;justify-content:flex-end}
+  /* 底部留白 = 实测的 .tab-bar 高度（含它自己的安全区 padding）+ 16px 间距，由 JS 量出来写进 --tabbar-h；
+     170px 之类的固定猜测值一旦 tab-bar 换成真实图标、高度变了就会漏算，量出来的才跟得上 */
+  .device-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--page-margin) calc(var(--tabbar-h, 170px) + 16px);box-sizing:border-box}
+  .device-card{background:#fff;border-radius:16px;padding:14px;height:120px;display:flex;flex-direction:column;justify-content:flex-end}
   .device-card .name{font-size:15px;font-weight:600;color:#1D2529}
   .device-card .loc{font-size:12px;color:#8a8d94}
-  .empty-state{text-align:center;padding:60px var(--page-margin) 170px;font-size:13px;color:#8a8d94}
+  .empty-state{text-align:center;padding:60px var(--page-margin) calc(var(--tabbar-h, 170px) + 16px);font-size:13px;color:#8a8d94;box-sizing:border-box}
+
+  /* 设备少时：撑满"BC 吸顶后剩余可视高度"，让内容正好一屏显示，不会多出一截还能继续往下滑；
+     设备多时内容自身高度本来就超过这个下限，min-height 不生效，滚动行为不受影响。
+     用 100dvh/--screen-h 走纯 CSS 计算而不是 JS 量一次存死，是因为移动端浏览器地址栏收起/展开会实时改变可视高度，
+     JS 量的是某一帧的快照，追不上这个变化；CSS calc 自己就会跟着 dvh 实时重算，不用操心时机 */
+  .device-grid, .empty-state{ min-height:calc(var(--screen-h) - var(--topbar-h) - var(--tabrow-h)); }
+  .shortcut-row + .device-grid, .shortcut-row + .empty-state{
+    min-height:calc(var(--screen-h) - var(--topbar-h) - var(--tabrow-h) - var(--shortcutrow-h));
+  }
 
   /* 底部 Tab 页签：占位版，固定吸底，最上层 */
   .tab-bar{
@@ -141,6 +203,7 @@
     .hint{display:none}
     .phone{
       width:100%;height:100dvh;border-radius:0;box-shadow:none;background:#f5f7fa;
+      --screen-h:100dvh;
     }
   }
 
@@ -150,12 +213,12 @@
 <div class="stage">
  <div class="stage-fit" id="stageFit">
   <div class="phone-wrap">
-    <div class="hint">框架草稿：验证"头像菜单固定 / header 背景图随滚动 / Batch Control tab 吸顶 / 列表滚动 / 底部吸底"的层级关系，图标与卡片都是占位</div>
+    <div class="hint">框架草稿：验证"头像菜单固定 / Batch Control tab 吸顶 / 列表滚动 / 底部吸底"的层级关系，图标与卡片都是占位</div>
     <div class="phone">
       <div class="screen" id="screen">
-        <div class="header-bg"></div>
         <div class="scroll-content">
-          <div class="header-fade-sticky"><div class="header-fade-bg" id="headerFadeBg"></div></div>
+          <div class="header-bg" id="headerBg"></div>
+          <div class="header-fade-bg" id="headerFadeBg"></div>
           <div class="page-title">My Home <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 17.3008C11.6745 17.3008 11.3783 17.1706 11.1113 16.9102L3.67969 9.30273C3.56901 9.19857 3.48438 9.08138 3.42578 8.95117C3.3737 8.81445 3.34766 8.66797 3.34766 8.51172C3.34766 8.29688 3.39648 8.10156 3.49414 7.92578C3.59831 7.75 3.73503 7.61328 3.9043 7.51562C4.07357 7.41146 4.26562 7.35938 4.48047 7.35938C4.79297 7.35938 5.06641 7.47656 5.30078 7.71094L12.4785 15.0645H11.5312L18.6992 7.71094C18.9336 7.47656 19.207 7.35938 19.5195 7.35938C19.7344 7.35938 19.9264 7.41146 20.0957 7.51562C20.265 7.61328 20.3984 7.75 20.4961 7.92578C20.6003 8.10156 20.6523 8.29688 20.6523 8.51172C20.6523 8.81771 20.5417 9.08138 20.3203 9.30273L12.8887 16.9102C12.765 17.0404 12.6283 17.138 12.4785 17.2031C12.3288 17.2682 12.1693 17.3008 12 17.3008Z" fill="currentColor"/></svg></div>
           <div class="banner">🔌 Behind TV2 (Plug) will turn on at 7:00PM</div>
 
@@ -183,7 +246,7 @@
         </div>
       </div>
 
-      <div class="tab-bar">
+      <div class="tab-bar" id="tabBar">
         <div class="item active"><span>⌂</span><span>Home</span></div>
         <div class="item"><span>◎</span><span>Cameras</span></div>
         <div class="item"><span>◍</span><span>Smart</span></div>
@@ -199,13 +262,27 @@
   var tabRow = document.getElementById('tabRow');
   var pager = document.getElementById('pager');
   var pagerTrack = document.getElementById('pagerTrack');
+  var phoneEl = document.querySelector('.phone');
+  var tabBarEl = document.getElementById('tabBar');
+  var topBar = document.getElementById('topBar');
+  var screenEl = document.getElementById('screen');
+  var headerFadeBg = document.getElementById('headerFadeBg');
   var CATS = Array.prototype.map.call(tabRow.querySelectorAll('.tab-pill'), function(b){ return b.dataset.cat; });
+
+  // device-grid/empty-state 底部要留多少空间才不会被吸底的 .tab-bar 挡住，直接量它的真实渲染高度，
+  // 不猜固定值——换真实图标导致 tab-bar 变高变矮时，这里自动跟着对，不用去改别处的数字
+  function syncTabBarHeight(){
+    phoneEl.style.setProperty('--tabbar-h', tabBarEl.offsetHeight + 'px');
+  }
+  syncTabBarHeight();
 
   // 占位设备数据：真实接口数据到了再替换，分类/收藏关系先按这个跑通 tab+pager 联动
   var DEVICES = [
     {cat:'cameras', fav:true},
     {cat:'lighting', fav:true},
     {cat:'switches'},
+    {cat:'switches'},
+    {cat:'plugs'},
     {cat:'plugs'},
     {cat:'environment'},
     {cat:'groups'},
@@ -250,6 +327,18 @@
     pagerTrack.appendChild(page);
   });
 
+  // 设备少的分类页（比如 Favorites 只有 2 个、Switches 只有 1 个）填满一屏这件事交给 CSS 的
+  // min-height:calc(var(--screen-h) - ...) 去做（见 .device-grid/.empty-state 规则），不在这量 px 存死——
+  // 真机浏览器地址栏收起/展开会实时改变可视高度，JS 量的只是某一帧快照，追不上这个变化，CSS calc 自己会跟着重算。
+
+  // .pager-track 是 flex 容器，默认 align-items:stretch 会把矮页面拉到和最高页面一样高；
+  // 用 JS 把 .pager 自身高度显式设成"当前激活页"的内容高度，.pager 的 overflow:hidden 会裁掉
+  // pager-track 内部因 stretch 产生的多余高度，这样切到矮页面时滚动范围也会跟着变矮，不再蹭别的分类。
+  function syncPagerHeight(){
+    var activePage = pagerTrack.children[pagerIdx];
+    if(activePage) pager.style.height = activePage.scrollHeight + 'px';
+  }
+
   function setActiveTab(cat){
     var btn = tabRow.querySelector('.tab-pill[data-cat="' + cat + '"]');
     if(!btn || btn.classList.contains('active')) return;
@@ -275,6 +364,7 @@
     pagerIdx = nextIdx;
     pagerAnimating = true;
     applyTransform(-pagerIdx * pager.clientWidth, true);
+    syncPagerHeight();
     if(!skipTabSync){
       var cat = CATS[pagerIdx];
       if(cat) setActiveTab(cat);
@@ -301,7 +391,70 @@
 
   window.addEventListener('resize', function(){
     if(!pagerAnimating) applyTransform(-pagerIdx * pager.clientWidth, false);
+    syncTabBarHeight();
+    syncPagerHeight();
+    updateFadeLayout();
   });
+  // 地址栏收起/展开只改变可视高度，不一定稳定触发 window 的 resize，visualViewport 专门盯这个
+  if(window.visualViewport) window.visualViewport.addEventListener('resize', syncPagerHeight);
+
+  // 顶部渐变背景整层的 opacity 跟着滚动走：scrollTop 从 0 滚到"BC 吸顶所需的滚动量"
+  // 这段区间内，opacity 从 0 线性过渡到 1，之后保持 1。BC 吸顶所需的滚动量 = BC 在文档流
+  // 里的原始 offsetTop 减去它吸顶时的 top 值（等于头像栏高度）——也就是 BC 上面
+  // page-title + banner 这些内容的高度，换真实图标/文案导致它们变高变矮时自动跟着对，
+  // 不用去猜写死的数字。渐变的高度同理，量"头像栏+BC"的实际渲染高度，正好盖到 BC
+  // 底边为止，不多出一截盖到下面的卡片区域。
+  var fadeMaxScroll = 0;
+  function updateFadeLayout(){
+    headerFadeBg.style.height = (topBar.offsetHeight + tabRow.offsetHeight) + 'px';
+    fadeMaxScroll = tabRow.offsetTop - topBar.offsetHeight;
+    updateFadeOpacity();
+  }
+  function updateFadeOpacity(){
+    var p = fadeMaxScroll > 0 ? Math.min(1, Math.max(0, screenEl.scrollTop / fadeMaxScroll)) : 1;
+    headerFadeBg.style.opacity = p;
+  }
+  updateFadeLayout();
+  screenEl.addEventListener('scroll', updateFadeOpacity, {passive:true});
+
+  // 临时调试面板：把关键图层的实测位置/z-index/opacity 直接打在屏幕左上角，
+  // 排查"图层顺序"问题用，截图时这些数字会一起拍进去，不用再靠肉眼猜。
+  // 排查完确认没问题后应该删掉这一段。
+  (function(){
+    var panel = document.createElement('div');
+    panel.id = 'debugPanel';
+    panel.style.cssText = 'position:fixed;top:4px;left:4px;z-index:99999;background:rgba(0,0,0,.78);color:#0f0;font:10px/1.4 monospace;padding:6px 8px;border-radius:6px;white-space:pre;pointer-events:none;max-width:90vw;';
+    document.body.appendChild(panel);
+    function rectOf(el){
+      var r = el.getBoundingClientRect();
+      var cs = getComputedStyle(el);
+      return 'top='+r.top.toFixed(0)+' bottom='+r.bottom.toFixed(0)+' left='+r.left.toFixed(0)+' z='+cs.zIndex+' pos='+cs.position+' op='+cs.opacity;
+    }
+    function render(){
+      var lines = [
+        'scrollTop='+screenEl.scrollTop.toFixed(0),
+        'headerBg:      '+rectOf(headerBg2),
+        'headerFadeBg:  '+rectOf(headerFadeBg),
+        'topBar:        '+rectOf(topBar),
+        'pageTitle:     '+rectOf(pageTitleEl),
+        'banner:        '+rectOf(bannerEl),
+        'tabRow:        '+rectOf(tabRow),
+        'pager:         '+rectOf(pager),
+        'deviceGrid:    '+(activeTail() ? rectOf(activeTail()) : 'n/a')
+      ];
+      panel.textContent = lines.join('\n');
+    }
+    var headerBg2 = document.getElementById('headerBg');
+    var pageTitleEl = document.querySelector('.page-title');
+    var bannerEl = document.querySelector('.banner');
+    function activeTail(){
+      var activePage = pagerTrack.children[pagerIdx];
+      return activePage ? activePage.querySelector('.device-grid, .empty-state') : null;
+    }
+    render();
+    screenEl.addEventListener('scroll', render, {passive:true});
+    window.addEventListener('resize', render);
+  })();
 
   // 拖拽/触摸：跟手滑动，松手按位移量+速度判定翻不翻页，和常见 banner 轮播一个套路
   var dragging = false, dragStartX = 0, dragStartTime = 0, dragBaseX = 0, dragDeltaX = 0;
@@ -376,6 +529,7 @@
     wheelIdleTimer = setTimeout(wheelBurstEnd, WHEEL_IDLE_GAP);
   }, {passive:false});
 
+  syncPagerHeight();
   applyTransform(0, false);
 
   var stageFit = document.getElementById('stageFit');
@@ -393,26 +547,6 @@
   }
   window.addEventListener('resize', fitStage);
   fitStage();
-
-  // 顶部渐变背景：随滚动淡入——scrollTop=0 时全透明，滚到 BC tab 吸顶的临界点时正好淡到 100%。
-  // offsetTop/offsetHeight 和 scrollTop 都是未经祖先 transform 缩放的本地坐标，三者统一用这套坐标算，
-  // 不会受桌面预览下 #stageFit 整体缩放的影响（和拖拽跟手那个 bug 是同一类坑）。
-  var screenEl = document.getElementById('screen');
-  var topBar = document.getElementById('topBar');
-  var headerFadeBg = document.getElementById('headerFadeBg');
-  var fadeMaxScroll = 1;
-  function updateFadeLayout(){
-    headerFadeBg.style.height = (topBar.offsetHeight + tabRow.offsetHeight) + 'px';
-    fadeMaxScroll = Math.max(1, tabRow.offsetTop - topBar.offsetHeight);
-  }
-  function updateFadeOpacity(){
-    var progress = Math.max(0, Math.min(1, screenEl.scrollTop / fadeMaxScroll));
-    headerFadeBg.style.opacity = progress;
-  }
-  screenEl.addEventListener('scroll', updateFadeOpacity, {passive:true});
-  window.addEventListener('resize', function(){ updateFadeLayout(); updateFadeOpacity(); });
-  updateFadeLayout();
-  updateFadeOpacity();
 </script>
 
 </body>
