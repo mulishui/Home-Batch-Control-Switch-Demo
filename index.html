@@ -66,9 +66,13 @@
 
   /* 顶部栏+BC tab 共用的渐变背景：固定在屏幕顶部不随内容滚动，透明度随滚动位置变化——
      一开始（大标题区）全透明，露出下面的 header-bg 大图；"My Home"随内容往上滚、
-     逐渐贴近头像栏时开始淡入，滚到 BC tab 完全吸顶时正好淡到 100%，取代 tab-row 原来自己的白底模糊 */
+     逐渐贴近头像栏时开始淡入，滚到 BC tab 完全吸顶时正好淡到 100%，取代 tab-row 原来自己的白底模糊。
+     必须塞在 .scroll-content 内部（而不是和 .screen 平级）：.tab-row 的 z-index 只在
+     .scroll-content 自己的层叠上下文里起作用，放外面哪怕 z-index 再高也会整块盖住 tab-row。
+     用 height:0 的 sticky 包一层，不占文档流空间，只让内部的实际背景块跟着贴顶。 */
+  .header-fade-sticky{position:sticky;top:0;height:0;z-index:4}
   .header-fade-bg{
-    position:absolute;top:0;left:0;right:0;z-index:4;
+    position:absolute;top:0;left:0;right:0;
     background:linear-gradient(to bottom, #A9C6EA 0%, #D6E6F6 55%, #F5F7FA 100%);
     backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
     opacity:0;pointer-events:none;
@@ -151,6 +155,7 @@
       <div class="screen" id="screen">
         <div class="header-bg"></div>
         <div class="scroll-content">
+          <div class="header-fade-sticky"><div class="header-fade-bg" id="headerFadeBg"></div></div>
           <div class="page-title">My Home <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 17.3008C11.6745 17.3008 11.3783 17.1706 11.1113 16.9102L3.67969 9.30273C3.56901 9.19857 3.48438 9.08138 3.42578 8.95117C3.3737 8.81445 3.34766 8.66797 3.34766 8.51172C3.34766 8.29688 3.39648 8.10156 3.49414 7.92578C3.59831 7.75 3.73503 7.61328 3.9043 7.51562C4.07357 7.41146 4.26562 7.35938 4.48047 7.35938C4.79297 7.35938 5.06641 7.47656 5.30078 7.71094L12.4785 15.0645H11.5312L18.6992 7.71094C18.9336 7.47656 19.207 7.35938 19.5195 7.35938C19.7344 7.35938 19.9264 7.41146 20.0957 7.51562C20.265 7.61328 20.3984 7.75 20.4961 7.92578C20.6003 8.10156 20.6523 8.29688 20.6523 8.51172C20.6523 8.81771 20.5417 9.08138 20.3203 9.30273L12.8887 16.9102C12.765 17.0404 12.6283 17.138 12.4785 17.2031C12.3288 17.2682 12.1693 17.3008 12 17.3008Z" fill="currentColor"/></svg></div>
           <div class="banner">🔌 Behind TV2 (Plug) will turn on at 7:00PM</div>
 
@@ -169,8 +174,6 @@
           <div class="pager" id="pager"><div class="pager-track" id="pagerTrack"></div></div>
         </div>
       </div>
-
-      <div class="header-fade-bg" id="headerFadeBg"></div>
 
       <div class="top-bar" id="topBar">
         <div class="avatar"></div>
