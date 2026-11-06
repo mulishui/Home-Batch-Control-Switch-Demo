@@ -88,19 +88,13 @@
      （跟随滚动淡入淡出的渐变叠加层）是两个独立的东西——它不跟随滚动进度变化，
      一直是完全可见的，所以这里不写 opacity，也不在 JS 里改它的 opacity。
      position:fixed 定位基准同样是 .phone（见上面 .phone 的 transform），不随
-     列表滚动产生位移。宽度 100% 自动填满；高度不能写死成桌面预览设计宽度（402px）
-     算出来的 364px——真机的 .phone 宽度是 100%，跟手机实际屏幕宽度走，不一定等于
-     402px，而 background-size:100% auto 是让图片宽度撑满容器后再等比缩放高度，
-     宽度一变图片的实际渲染高度也会变。如果容器高度还卡死在 364px，两者就会错位，
-     没被图片盖住的那截会露出页面底色 #f5f7fa，看起来像图和底色之间多了一条线
-     （之前真机上出现过，图片素材本身是无缝的，根因是这里）。所以改用 aspect-ratio
-     按图片真实像素比例（804:728，即 @2x 下 402:364）让容器高度跟着实际渲染宽度
-     等比例变化，始终和背景图缩放后的高度严格一致，不管真机屏幕多宽都不会露缝。
+     列表滚动产生位移。宽度 100% 自动填满，高度写死成素材本身的设计高度（图片
+     @2x 导出，728px / 2 = 364px），这是真实资源的固有尺寸，不是靠猜的占位数字。
      z-index 给全场最低的 2，保证它在 page-title/banner（3）和 header-fade-bg（4）
      之下，是名副其实的最底层。 */
   .header-bg{
-    position:fixed;top:0;left:0;right:0;z-index:2;aspect-ratio:804/728;
-    background:url(assets/header-bg@2x.png) top/100% 100% no-repeat;
+    position:fixed;top:0;left:0;right:0;z-index:2;height:364px;
+    background:url(assets/header-bg@2x.png) top/100% auto no-repeat;
     pointer-events:none;
   }
 
