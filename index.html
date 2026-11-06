@@ -228,6 +228,7 @@
   // 翻页动画是否在跑，靠自己触发的 transitionend 判断，不依赖浏览器原生滚动/惯性
   var pagerIdx = 0;
   var pagerAnimating = false;
+  var stageScale = 1; // 桌面预览下 #stageFit 会整体缩放，拖拽用的是真实鼠标像素，要除以缩放比才能跟手
 
   function applyTransform(px, withTransition){
     pagerTrack.style.transition = withTransition ? 'transform .32s cubic-bezier(.22,.61,.36,1)' : 'none';
@@ -282,7 +283,7 @@
   }
   function dragMove(x){
     if(!dragging) return;
-    dragDeltaX = x - dragStartX;
+    dragDeltaX = (x - dragStartX) / stageScale;
     var atFirst = pagerIdx === 0 && dragDeltaX > 0;
     var atLast = pagerIdx === CATS.length - 1 && dragDeltaX < 0;
     var resisted = (atFirst || atLast) ? dragDeltaX * 0.35 : dragDeltaX; // 到头之后加阻尼，避免空荡荡地拖出一大截
@@ -346,12 +347,14 @@
   function fitStage(){
     if(window.matchMedia('(max-width:600px)').matches){
       stageFit.style.transform = '';
+      stageScale = 1;
       return;
     }
     stageFit.style.transform = 'scale(1)';
     var rect = stageFit.getBoundingClientRect();
     var scale = Math.min(1, (window.innerWidth - 32) / rect.width, (window.innerHeight - 32) / rect.height);
     stageFit.style.transform = 'scale(' + scale + ')';
+    stageScale = scale;
   }
   window.addEventListener('resize', fitStage);
   fitStage();
