@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- black-translucent 会让状态栏盖在页面内容上，系统对状态栏下面的内容做一层原生毛玻璃模糊
+     （头像紧贴顶部时最明显）；改成 default 后状态栏变成不透明实色条，不再盖内容，也就没有
+     这层模糊了，代价是状态栏区域不再和下面的浅蓝渐变无缝衔接，详见 .phone 里 --safe-top 的注释 -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Batch Control 切换 Demo · 框架草稿</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -30,7 +33,8 @@
        以外层桌面预览缩放容器 #stageFit（甚至是真实视口）为基准，宽度/位置就对不上手机屏幕了 */
     transform:translateZ(0);
     user-select:none;-webkit-user-select:none;
-    /* 顶部安全区：加到主屏幕独立运行时用真实 env()，桌面预览时退回模拟值 59px */
+    /* 顶部安全区：这个 59px floor 是桌面预览模式下模拟手机状态栏高度用的（桌面浏览器里
+       env() 恒为 0），真机移动端会被下方 @media 里更小的 --safe-top 覆盖掉，见那边注释 */
     --safe-top:max(59px, env(safe-area-inset-top, 0px));
     --topbar-h:calc(var(--safe-top) + 64px);
     --page-margin:16px;
@@ -301,6 +305,12 @@
     .phone{
       width:100%;height:100dvh;border-radius:0;box-shadow:none;background:#f5f7fa;
       --screen-h:100dvh;
+      /* 状态栏改成不透明实色条（见 apple-mobile-web-app-status-bar-style）之后，系统会自己
+         在状态栏下面留出对应高度，页面内容不再往状态栏底下延伸，env(safe-area-inset-top)
+         在真机上会跟着变回 0——基础规则里 max(59px, ...) 那个 59px 是以前给"内容盖住状态栏"
+         这种沉浸式场景准备的模拟值，现在不再需要，留着反而会在系统已经让出的空间下面再多出
+         一截，这里用一个小一点的呼吸间距盖掉那个 59px */
+      --safe-top:calc(env(safe-area-inset-top, 0px) + 12px);
     }
   }
 
