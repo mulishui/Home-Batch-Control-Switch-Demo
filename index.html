@@ -175,13 +175,15 @@
   .shortcut-row::-webkit-scrollbar{display:none}
   .shortcut-row img{height:64px;display:block}
 
-  /* 底部留白 = 实测的 .tab-bar 高度（含它自己的安全区 padding）+ 16px 间距，由 JS 量出来写进 --tabbar-h；
-     170px 之类的固定猜测值一旦 tab-bar 换成真实图标、高度变了就会漏算，量出来的才跟得上 */
-  .device-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--page-margin) calc(var(--tabbar-h, 170px) + 16px);box-sizing:border-box}
+  /* 底部留白只留一个正常的间距（16px），不再按 .tab-bar 的实测高度整段让出来——
+     tab-bar 本身是悬浮在内容上面的（position:absolute，不在文档流里占位），列表本来就该
+     滚到最后一张卡片贴近底部为止，最后这段会被 .tab-fade-bg 渐变 + tab-bar 盖住/淡出，
+     而不是靠死留白把列表"顶"到 tab-bar 上面去，不然渐变盖住的永远是空白，看不出渐变效果 */
+  .device-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--page-margin) 16px;box-sizing:border-box}
   .device-card{background:#fff;border-radius:16px;padding:14px;height:120px;display:flex;flex-direction:column;justify-content:flex-end;position:relative}
   .device-card .name{font-size:15px;font-weight:600;color:#1D2529}
   .device-card .loc{font-size:12px;color:#8a8d94}
-  .empty-state{text-align:center;padding:60px var(--page-margin) calc(var(--tabbar-h, 170px) + 16px);font-size:13px;color:#8a8d94;box-sizing:border-box}
+  .empty-state{text-align:center;padding:60px var(--page-margin) 16px;font-size:13px;color:#8a8d94;box-sizing:border-box}
 
   /* 设备少时：撑满"BC 吸顶后剩余可视高度"，让内容正好一屏显示，不会多出一截还能继续往下滑；
      设备多时内容自身高度本来就超过这个下限，min-height 不生效，滚动行为不受影响。
@@ -197,7 +199,7 @@
   /* All Devices 房间分组：标题行 + 自己的一组 device-grid，多组纵向堆叠 */
   .room-section .device-grid{padding:0 var(--page-margin)}
   .room-section:first-of-type .room-header{padding-top:14px}
-  .room-section:last-of-type .device-grid{padding-bottom:calc(var(--tabbar-h, 170px) + 16px)}
+  .room-section:last-of-type .device-grid{padding-bottom:16px}
   .room-header{
     display:flex;align-items:center;gap:4px;padding:18px var(--page-margin) 10px;
     font-size:17px;font-weight:600;color:#1D2529;
