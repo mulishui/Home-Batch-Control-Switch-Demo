@@ -288,6 +288,16 @@
     .stage-fit{width:100%;height:100%;gap:0;transform:none !important}
     .phone-wrap{width:100%;height:100%;gap:0}
     .hint{display:none}
+    /* .phone 的高度本来就该等于 100dvh，但真机"添加到主屏幕"后的独立显示模式下，
+       WKWebView 算出来的 100dvh 偶发比真实可视区域偏大，.tab-bar/.tab-fade-bg 原来是
+       absolute 贴 .phone 的 bottom:0，跟着 .phone 这个不准的高度走，底部就会空出一截
+       页面内容够不到、也不是真机物理边缘的空白。干脆不跟 .phone 的高度较劲——去掉
+       .phone 这层 transform 建立的 fixed 定位基准（见上面 .phone 基础规则的注释），让
+       .tab-bar/.tab-fade-bg 改成 fixed 之后直接贴真实可视视口的底边，不管 .phone 自己
+       量出来的高度准不准，这两个元素的位置都只认真实屏幕底部 */
+    .phone{transform:none}
+    .tab-bar{position:fixed;padding-bottom:24px}
+    .tab-fade-bg{position:fixed}
     .phone{
       width:100%;height:100dvh;border-radius:0;box-shadow:none;background:#f5f7fa;
       --screen-h:100dvh;
@@ -377,7 +387,6 @@
   var pager = document.getElementById('pager');
   var pagerTrack = document.getElementById('pagerTrack');
   var phoneEl = document.querySelector('.phone');
-  var stageEl = document.querySelector('.stage');
   var tabBarEl = document.getElementById('tabBar');
   var topBar = document.getElementById('topBar');
   var screenEl = document.getElementById('screen');
@@ -389,20 +398,9 @@
   var PHONE_ASPECT = 402 / 874;
   function sizePhone(){
     if(window.matchMedia('(max-width:600px)').matches){
-      // 移动端（含"添加到主屏幕"后的独立显示模式）：不吃 CSS 的 100dvh——iOS standalone
-      // 模式下 100dvh 有时会比真实可视区域量得大一截（WKWebView 用的是启动瞬间的一份
-      // 不准的视口快照），底部就会空出一条真实设备截不到、页面也填不满的空白。改成 JS
-      // 实测 visualViewport.height（比 window.innerHeight 更贴近真实可视区域，地址栏/
-      // 系统手势条收起展开时也会实时更新）写成 inline 高度，不依赖 dvh 这个值本身准不准。
-      // .stage 也必须跟着设成同一个值，而不是只改 .phone：.stage/.stage-fit/.phone-wrap
-      // 这条外层链路原来还是 CSS 的 100dvh，一旦它比 .phone 量出来的 vh 大，.phone 在
-      // flex 列里是 flex-start 对齐，会贴顶留在上面，差出来的高度就变成 .phone 下方、
-      // .phone-wrap 内部的一截空白——.phone 自己再准也挡不住外层撑高。
-      var vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
-      phoneEl.style.width = '100%';
-      phoneEl.style.height = vh + 'px';
-      phoneEl.style.setProperty('--screen-h', vh + 'px');
-      stageEl.style.height = vh + 'px';
+      phoneEl.style.width = '';
+      phoneEl.style.height = '';
+      phoneEl.style.removeProperty('--screen-h');
       return;
     }
     var availH = window.innerHeight - 96;
@@ -413,10 +411,6 @@
     phoneEl.style.setProperty('--screen-h', h + 'px');
   }
   sizePhone();
-  // "添加到主屏幕"后首次启动，standalone 模式下 iOS 偶发在首帧给出的 visualViewport
-  // 高度还没收敛到真实值，要等布局/系统手势条状态稳定后才准——延迟重算一次兜底，
-  // 不影响其余场景（非 standalone 时这次重算量到的值和首次一样，等于什么都没变）
-  if(window.navigator.standalone){ setTimeout(sizePhone, 300); }
 
   // device-grid/empty-state 底部要留多少空间才不会被吸底的 .tab-bar 挡住，直接量它的真实渲染高度，
   // 不猜固定值——换真实图标导致 tab-bar 变高变矮时，这里自动跟着对，不用去改别处的数字
@@ -622,12 +616,8 @@
     syncPagerHeight();
     updateFadeLayout();
   });
-  // 地址栏收起/展开只改变可视高度，不一定稳定触发 window 的 resize，visualViewport 专门盯这个；
-  // sizePhone 也要跟着重算，不然移动端手机框的实测高度跟不上这次变化
-  if(window.visualViewport) window.visualViewport.addEventListener('resize', function(){
-    sizePhone();
-    syncPagerHeight();
-  });
+  // 地址栏收起/展开只改变可视高度，不一定稳定触发 window 的 resize，visualViewport 专门盯这个
+  if(window.visualViewport) window.visualViewport.addEventListener('resize', syncPagerHeight);
 
   // 顶部渐变背景整层的 opacity 跟着滚动走：scrollTop 从 0 滚到"BC 吸顶所需的滚动量"
   // 这段区间内，opacity 从 0 线性过渡到 1，之后保持 1。BC 吸顶所需的滚动量 = BC 在文档流
