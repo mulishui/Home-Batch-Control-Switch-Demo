@@ -128,21 +128,26 @@
      自己不再带白底模糊，吸顶后露出来的是 header-fade-bg 淡到 100% 的那层渐变 */
   .tab-row{
     position:sticky;top:var(--topbar-h);z-index:6;
-    display:flex;gap:10px;padding:10px var(--page-margin);overflow-x:auto;scroll-snap-type:x proximity;
-    scroll-padding:10px var(--page-margin);
+    display:flex;gap:10px;padding:10px var(--page-margin);overflow-x:auto;
   }
   .tab-row::-webkit-scrollbar{display:none}
   .tab-pill{
-    flex:0 0 auto;scroll-snap-align:start;border:none;cursor:pointer;box-sizing:border-box;
+    flex:0 0 auto;border:none;cursor:pointer;box-sizing:border-box;
     height:48px;min-width:56px;padding:0 16px;border-radius:24px;background:#fff;color:var(--accent,#1D2529);
     font-size:14px;font-weight:400;white-space:nowrap;
     display:flex;align-items:center;justify-content:center;gap:0;
     transform:scale(1);transition:transform .25s cubic-bezier(.34,1.56,.64,1),background-color .2s ease,color .2s ease,gap .2s ease;
   }
   .tab-pill svg{width:24px;height:24px;flex:0 0 auto;display:block}
-  .tab-pill span{display:none}
+  /* 文字不用 display:none/inline-block 切换——display 没法被 transition 插值，会瞬间蹦出来，
+     把缩放/变色这些本该平滑的动画盖过去，看起来像"一帧闪现"。改用 max-width+opacity 过渡展开，
+     max-width 给够一个比最长 label（Environment/All Devices）更宽的值即可，实际宽度由内容撑开 */
+  .tab-pill span{
+    display:inline-block;max-width:0;opacity:0;overflow:hidden;white-space:nowrap;
+    transition:max-width .25s cubic-bezier(.34,1.56,.64,1),opacity .2s ease;
+  }
   .tab-pill.active{background:var(--accent,#0a84ff);color:#fff;gap:8px;transform:scale(1.08)}
-  .tab-pill.active span{display:inline-block}
+  .tab-pill.active span{max-width:120px;opacity:1}
 
   /* 分类列表：横向分页容器，和 banner 轮播同一套做法——
      不依赖原生滚动/scroll-snap，而是用 translateX + transition 直接控制位移，
@@ -172,7 +177,7 @@
   /* 底部留白 = 实测的 .tab-bar 高度（含它自己的安全区 padding）+ 16px 间距，由 JS 量出来写进 --tabbar-h；
      170px 之类的固定猜测值一旦 tab-bar 换成真实图标、高度变了就会漏算，量出来的才跟得上 */
   .device-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--page-margin) calc(var(--tabbar-h, 170px) + 16px);box-sizing:border-box}
-  .device-card{background:#fff;border-radius:16px;padding:14px;height:120px;display:flex;flex-direction:column;justify-content:flex-end}
+  .device-card{background:#fff;border-radius:16px;padding:14px;height:120px;display:flex;flex-direction:column;justify-content:flex-end;position:relative}
   .device-card .name{font-size:15px;font-weight:600;color:#1D2529}
   .device-card .loc{font-size:12px;color:#8a8d94}
   .empty-state{text-align:center;padding:60px var(--page-margin) calc(var(--tabbar-h, 170px) + 16px);font-size:13px;color:#8a8d94;box-sizing:border-box}
@@ -180,23 +185,54 @@
   /* 设备少时：撑满"BC 吸顶后剩余可视高度"，让内容正好一屏显示，不会多出一截还能继续往下滑；
      设备多时内容自身高度本来就超过这个下限，min-height 不生效，滚动行为不受影响。
      用 100dvh/--screen-h 走纯 CSS 计算而不是 JS 量一次存死，是因为移动端浏览器地址栏收起/展开会实时改变可视高度，
-     JS 量的是某一帧的快照，追不上这个变化；CSS calc 自己就会跟着 dvh 实时重算，不用操心时机 */
-  .device-grid, .empty-state{ min-height:calc(var(--screen-h) - var(--topbar-h) - var(--tabrow-h)); }
+     JS 量的是某一帧的快照，追不上这个变化；CSS calc 自己就会跟着 dvh 实时重算，不用操心时机。
+     只给 .pager-page 直接子级的 device-grid 撑满一屏——All Devices 页里嵌在 .room-section 里的
+     device-grid 是分组小网格，撑满一屏会把三组撑成三屏空白，不能套这条规则 */
+  .pager-page > .device-grid, .empty-state{ min-height:calc(var(--screen-h) - var(--topbar-h) - var(--tabrow-h)); }
   .shortcut-row + .device-grid, .shortcut-row + .empty-state{
     min-height:calc(var(--screen-h) - var(--topbar-h) - var(--tabrow-h) - var(--shortcutrow-h));
   }
 
-  /* 底部 Tab 页签：占位版，固定吸底，最上层 */
+  /* All Devices 房间分组：标题行 + 自己的一组 device-grid，多组纵向堆叠 */
+  .room-section .device-grid{padding:0 var(--page-margin)}
+  .room-section:first-of-type .room-header{padding-top:14px}
+  .room-section:last-of-type .device-grid{padding-bottom:calc(var(--tabbar-h, 170px) + 16px)}
+  .room-header{
+    display:flex;align-items:center;gap:4px;padding:18px var(--page-margin) 10px;
+    font-size:17px;font-weight:600;color:#1D2529;
+  }
+  .room-header svg{width:14px;height:14px;color:#c2c4ca;transform:rotate(-90deg)}
+
+  .device-card.on{background:#E3EFFC}
+  .device-card .card-top{display:flex;align-items:center;justify-content:space-between;position:absolute;top:14px;left:14px;right:14px}
+  .device-card .icon{position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#b5b8c0}
+  .device-card .icon svg{width:22px;height:22px}
+  .device-card.on .icon.icon-bulb{color:#FFBF3F}
+  .device-card.on .icon.icon-plug{color:#0a84ff}
+  .device-card .badge-shared{
+    position:absolute;top:-4px;left:-4px;width:16px;height:16px;border-radius:5px;
+    background:#1D2529;color:#fff;display:flex;align-items:center;justify-content:center;
+  }
+  .device-card .badge-shared svg{width:11px;height:11px}
+  .device-card .power-btn{
+    width:28px;height:28px;border-radius:50%;border:1.5px solid #e3e5ea;background:#fff;
+    color:#b5b8c0;display:flex;align-items:center;justify-content:center;
+  }
+  .device-card .power-btn svg{width:15px;height:15px}
+  .device-card .power-btn.on{border-color:#0a84ff;background:#0a84ff;color:#fff}
+  .device-card .percent{display:flex;align-items:center;gap:4px;font-size:12px;color:#FF9F0A;margin-top:2px}
+  .device-card .percent i{width:6px;height:6px;border-radius:50%;background:#FF9F0A;display:block}
+  .device-card .badge-new{
+    position:absolute;right:14px;bottom:14px;font-size:10px;font-weight:700;color:#fff;
+    background:#FF9F0A;border-radius:6px;padding:2px 6px;line-height:1;
+  }
+
+  /* 底部 Tab 页签：先用截图整体占位，后面给 SVG 后换成逐项真实实现 */
   .tab-bar{
     position:absolute;left:0;right:0;bottom:0;z-index:20;
-    display:flex;justify-content:space-around;align-items:center;
-    padding:8px 0 calc(env(safe-area-inset-bottom, 0px) + 6px);
-    background:rgba(255,255,255,.9);
-    backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
-    border-top:1px solid rgba(29,37,41,.06);
+    padding:10px var(--page-margin) calc(env(safe-area-inset-bottom, 0px) + 10px);
   }
-  .tab-bar .item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:#8a8d94}
-  .tab-bar .item.active{color:#0a84ff}
+  .tab-bar img{width:100%;display:block}
 
   .hint{text-align:center;font-size:12px;color:#a8abb3;max-width:340px}
 
@@ -250,12 +286,9 @@
         </div>
       </div>
 
+      <!-- 占位版：先用截图整图顶替，真实交互版等 SVG 素材到位后再换成逐项按钮 -->
       <div class="tab-bar" id="tabBar">
-        <div class="item active"><span>⌂</span><span>Home</span></div>
-        <div class="item"><span>◎</span><span>Cameras</span></div>
-        <div class="item"><span>◍</span><span>Smart</span></div>
-        <div class="item"><span>▢</span><span>Shop</span></div>
-        <div class="item"><span>✦</span><span></span></div>
+        <img src="assets/tab-bar-placeholder@2x.png" alt="">
       </div>
     </div>
   </div>
@@ -280,23 +313,87 @@
   }
   syncTabBarHeight();
 
-  // 占位设备数据：真实接口数据到了再替换，分类/收藏关系先按这个跑通 tab+pager 联动
+  // 占位设备数据：真实接口数据到了再替换，分类/收藏关系先按这个跑通 tab+pager 联动。
+  // room/icon/on/percent/isNew/shared/secondary 这几个字段只给 All Devices 的房间分组视图用，
+  // 其余分类 tab 仍然只看 cat/fav，渲染路径不受影响。
   var DEVICES = [
-    {cat:'cameras', fav:true},
-    {cat:'lighting', fav:true},
-    {cat:'switches'},
-    {cat:'switches'},
-    {cat:'plugs'},
-    {cat:'plugs'},
-    {cat:'environment'},
-    {cat:'groups'},
-    {cat:'others'}
+    {cat:'lighting', fav:true, room:'living', icon:'bulb', on:false, secondary:'Location Info'},
+    {cat:'lighting', room:'living', icon:'bulb', on:true, percent:100, secondary:'Location Info'},
+    {cat:'plugs', room:'living', icon:'plug', on:true, secondary:'Location Info'},
+    {cat:'switches', room:'living', icon:'bulb', on:false, secondary:'Location Info'},
+    {cat:'plugs', room:'living', icon:'plug', on:true, isNew:true, secondary:'Location Info'},
+    {cat:'switches', room:'living', icon:'bulb', on:false, secondary:'Location Info'},
+    {cat:'cameras', fav:true, room:'shared', icon:'bulb', on:false, shared:true, secondary:'#Owner Home Name'},
+    {cat:'environment', room:'shared', icon:'bulb', on:true, percent:100, shared:true, secondary:'#Owner Home Name'},
+    {cat:'plugs', room:'shared', icon:'plug', on:true, shared:true, secondary:'#Owner Home Name'},
+    {cat:'groups', room:'shared', icon:'bulb', on:false, shared:true, isNew:true, secondary:'#Owner Home Name'},
+    {cat:'others', room:'others', icon:'bulb', on:false, secondary:'Local Only'},
+    {cat:'others', room:'others', icon:'bulb', on:true, percent:100, secondary:'Local Only'},
+    {cat:'environment', room:'others', icon:'plug', on:true, secondary:'Local Only'},
+    {cat:'groups', room:'others', icon:'bulb', on:false, secondary:'Local Only'}
   ];
+
+  var ROOM_SECTIONS = [
+    {key:'living', title:'Living Room'},
+    {key:'shared', title:'Shared by Others'},
+    {key:'others', title:'Others'}
+  ];
+
+  var DEVICE_ICON_PATHS = {
+    bulb:'M5.4668 6.30469C5.4668 5.46484 5.63281 4.68034 5.96484 3.95117C6.30339 3.22201 6.76888 2.58398 7.36133 2.03711C7.96029 1.48372 8.65365 1.05404 9.44141 0.748047C10.2357 0.442057 11.0885 0.289062 12 0.289062C12.9115 0.289062 13.7643 0.442057 14.5586 0.748047C15.3529 1.05404 16.0462 1.48372 16.6387 2.03711C17.2376 2.58398 17.7031 3.22201 18.0352 3.95117C18.3672 4.68034 18.5332 5.46484 18.5332 6.30469C18.5332 7.0599 18.4486 7.72721 18.2793 8.30664C18.1165 8.87956 17.9049 9.44271 17.6445 9.99609C17.3906 10.5495 17.127 11.1582 16.8535 11.8223C16.5801 12.4863 16.3327 13.2741 16.1113 14.1855C15.8965 15.0905 15.75 16.194 15.6719 17.4961C15.6589 17.6719 15.6003 17.8118 15.4961 17.916C15.3919 18.0202 15.2454 18.0723 15.0566 18.0723H8.94336C8.75456 18.0723 8.60807 18.0202 8.50391 17.916C8.40625 17.8118 8.35091 17.6719 8.33789 17.4961C8.25977 16.194 8.11003 15.0905 7.88867 14.1855C7.67383 13.2741 7.42969 12.4863 7.15625 11.8223C6.88281 11.1582 6.61589 10.5495 6.35547 9.99609C6.10156 9.44271 5.88997 8.87956 5.7207 8.30664C5.55143 7.72721 5.4668 7.0599 5.4668 6.30469ZM8.91406 20.1816C8.7513 20.1816 8.61458 20.1263 8.50391 20.0156C8.39323 19.9049 8.33789 19.7682 8.33789 19.6055C8.33789 19.4492 8.39323 19.3158 8.50391 19.2051C8.61458 19.0944 8.7513 19.0391 8.91406 19.0391H15.0957C15.252 19.0391 15.3854 19.0944 15.4961 19.2051C15.6068 19.3158 15.6621 19.4492 15.6621 19.6055C15.6621 19.7682 15.6068 19.9049 15.4961 20.0156C15.3854 20.1263 15.252 20.1816 15.0957 20.1816H8.91406ZM12 23.0137C11.2383 23.0137 10.5775 22.8411 10.0176 22.4961C9.46419 22.1576 9.17122 21.7083 9.13867 21.1484H14.8711C14.8255 21.7083 14.5228 22.1576 13.9629 22.4961C13.4095 22.8411 12.7552 23.0137 12 23.0137Z',
+    plug:'M6.39258 20.2578C5.47266 20.2578 4.78125 20.0293 4.31836 19.5723C3.86133 19.1211 3.63281 18.4414 3.63281 17.5332V6.80176C3.63281 5.89355 3.86133 5.21387 4.31836 4.7627C4.78125 4.30566 5.47266 4.07715 6.39258 4.07715H17.6074C18.5273 4.07715 19.2158 4.30566 19.6729 4.7627C20.1357 5.21387 20.3672 5.89355 20.3672 6.80176V17.5332C20.3672 18.4414 20.1357 19.1211 19.6729 19.5723C19.2158 20.0293 18.5273 20.2578 17.6074 20.2578H6.39258ZM11.6309 11.0908H12.3604C12.5127 11.0908 12.6357 11.0439 12.7295 10.9502C12.8232 10.8564 12.8701 10.7305 12.8701 10.5723V7.92676C12.8701 7.77441 12.8232 7.65137 12.7295 7.55762C12.6357 7.46387 12.5127 7.41699 12.3604 7.41699H11.6309C11.4785 7.41699 11.3555 7.46387 11.2617 7.55762C11.168 7.65137 11.1211 7.77441 11.1211 7.92676V10.5723C11.1211 10.7305 11.168 10.8564 11.2617 10.9502C11.3555 11.0439 11.4785 11.0908 11.6309 11.0908ZM7.64941 16.4346H10.0049C10.1572 16.4346 10.2803 16.3906 10.374 16.3027C10.4678 16.209 10.5146 16.0859 10.5146 15.9336V15.1953C10.5146 15.043 10.4678 14.9199 10.374 14.8262C10.2803 14.7324 10.1572 14.6855 10.0049 14.6855H7.64941C7.49121 14.6855 7.36523 14.7324 7.27148 14.8262C7.18359 14.9199 7.13965 15.043 7.13965 15.1953V15.9336C7.13965 16.0859 7.18359 16.209 7.27148 16.3027C7.36523 16.3906 7.49121 16.4346 7.64941 16.4346ZM13.9951 16.4346H16.3418C16.5059 16.4346 16.6318 16.3906 16.7197 16.3027C16.8135 16.209 16.8604 16.0859 16.8604 15.9336V15.1953C16.8604 15.043 16.8135 14.9199 16.7197 14.8262C16.626 14.7324 16.5 14.6855 16.3418 14.6855H13.9951C13.8428 14.6855 13.7168 14.7324 13.6172 14.8262C13.5234 14.9199 13.4766 15.043 13.4766 15.1953V15.9336C13.4766 16.0859 13.5234 16.209 13.6172 16.3027C13.7168 16.3906 13.8428 16.4346 13.9951 16.4346Z'
+  };
 
   function devicesFor(cat){
     if(cat === 'all') return DEVICES;
     if(cat === 'favorites') return DEVICES.filter(function(d){ return d.fav; });
     return DEVICES.filter(function(d){ return d.cat === cat; });
+  }
+
+  // 简单占位卡片：除 All Devices 外的分类 tab 用这个，没有开关/百分比/角标这些信息
+  function buildPlainDeviceCard(){
+    var card = document.createElement('div');
+    card.className = 'device-card';
+    card.innerHTML = '<div class="name">Device Name</div><div class="loc">Location Info</div>';
+    return card;
+  }
+
+  // 带开关状态/百分比/NEW/共享角标的卡片：All Devices 的房间分组视图专用
+  function buildRichDeviceCard(d){
+    var card = document.createElement('div');
+    card.className = 'device-card' + (d.on ? ' on' : '');
+    var iconPath = DEVICE_ICON_PATHS[d.icon] || DEVICE_ICON_PATHS.bulb;
+    var sharedBadge = d.shared ? '<span class="badge-shared"><svg viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2.2" fill="currentColor"/><circle cx="17" cy="6" r="2.2" fill="currentColor"/><circle cx="17" cy="18" r="2.2" fill="currentColor"/><path d="M8 11L15 7M8 13L15 17" stroke="currentColor" stroke-width="1.6"/></svg></span>' : '';
+    var percentHtml = (d.on && d.percent != null) ? '<div class="percent"><i></i>' + d.percent + '%</div>' : '';
+    var newBadge = d.isNew ? '<span class="badge-new">NEW</span>' : '';
+    card.innerHTML =
+      '<div class="card-top">' +
+        '<span class="icon icon-' + d.icon + '"><svg viewBox="0 0 24 24" fill="none"><path d="' + iconPath + '" fill="currentColor"/></svg>' + sharedBadge + '</span>' +
+        '<button class="power-btn' + (d.on ? ' on' : '') + '"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2.5V11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M6.5 5.5A8 8 0 1 0 17.5 5.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>' +
+      '</div>' +
+      '<div class="name">Device Name</div>' +
+      percentHtml +
+      '<div class="loc">' + d.secondary + '</div>' +
+      newBadge;
+    return card;
+  }
+
+  // All Devices 页按 room 分组渲染：每组一个标题行（文字 + 右箭头）+ 自己的 2 列卡片网格
+  function buildRoomGroupedPage(list){
+    var frag = document.createDocumentFragment();
+    ROOM_SECTIONS.forEach(function(section){
+      var items = list.filter(function(d){ return d.room === section.key; });
+      if(items.length === 0) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'room-section';
+      wrap.innerHTML = '<div class="room-header">' + section.title + '<svg viewBox="0 0 24 24" fill="none"><path d="M12 17.3008C11.6745 17.3008 11.3783 17.1706 11.1113 16.9102L3.67969 9.30273C3.56901 9.19857 3.48438 9.08138 3.42578 8.95117C3.3737 8.81445 3.34766 8.66797 3.34766 8.51172C3.34766 8.29688 3.39648 8.10156 3.49414 7.92578C3.59831 7.75 3.73503 7.61328 3.9043 7.51562C4.07357 7.41146 4.26562 7.35938 4.48047 7.35938C4.79297 7.35938 5.06641 7.47656 5.30078 7.71094L12.4785 15.0645H11.5312L18.6992 7.71094C18.9336 7.47656 19.207 7.35938 19.5195 7.35938C19.7344 7.35938 19.9264 7.41146 20.0957 7.51562C20.265 7.61328 20.3984 7.75 20.4961 7.92578C20.6003 8.10156 20.6523 8.29688 20.6523 8.51172C20.6523 8.81771 20.5417 9.08138 20.3203 9.30273L12.8887 16.9102C12.765 17.0404 12.6283 17.138 12.4785 17.2031C12.3288 17.2682 12.1693 17.3008 12 17.3008Z" fill="currentColor"/></svg></div>';
+      var grid = document.createElement('div');
+      grid.className = 'device-grid';
+      items.forEach(function(d){ grid.appendChild(buildRichDeviceCard(d)); });
+      wrap.appendChild(grid);
+      frag.appendChild(wrap);
+    });
+    return frag;
   }
 
   CATS.forEach(function(cat){
@@ -317,15 +414,12 @@
       empty.className = 'empty-state';
       empty.textContent = '该分类下暂无设备';
       page.appendChild(empty);
+    } else if(cat === 'all'){
+      page.appendChild(buildRoomGroupedPage(list));
     } else {
       var grid = document.createElement('div');
       grid.className = 'device-grid';
-      list.forEach(function(){
-        var card = document.createElement('div');
-        card.className = 'device-card';
-        card.innerHTML = '<div class="name">Device Name</div><div class="loc">Location Info</div>';
-        grid.appendChild(card);
-      });
+      list.forEach(function(){ grid.appendChild(buildPlainDeviceCard()); });
       page.appendChild(grid);
     }
     pagerTrack.appendChild(page);
@@ -348,7 +442,13 @@
     if(!btn || btn.classList.contains('active')) return;
     tabRow.querySelectorAll('.tab-pill').forEach(function(p){ p.classList.remove('active'); });
     btn.classList.add('active');
-    btn.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
+    // 不能在加 active 的同一帧就量尺寸去滚动：这时候展开动画（span max-width、transform 缩放，
+    // 都是 .25s）还没开始播，量到的是展开前的小尺寸，按小尺寸算出的滚动位置，等动画播完变大后
+    // 反而会露出一截在屏幕外（之前就是这么漏的）。等展开动画播完再量真实尺寸、再滚动。
+    // inline:'nearest' 保证已经完全可见的 tab 不会被多余地居中/移动，只有被裁切的才会动
+    setTimeout(function(){
+      if(btn.classList.contains('active')) btn.scrollIntoView({behavior:'smooth', inline:'nearest', block:'nearest'});
+    }, 260);
   }
 
   // ---- 分类列表轮播：translateX + transition 直接控制位移，做法和 banner 轮播一致 ----
