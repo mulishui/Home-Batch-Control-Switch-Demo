@@ -227,12 +227,32 @@
     background:#FF9F0A;border-radius:6px;padding:2px 6px;line-height:1;
   }
 
-  /* 底部 Tab 页签：先用截图整体占位，后面给 SVG 后换成逐项真实实现 */
+  /* 底部 Tab 页签：胶囊条 + 右侧圆形 Logo 按钮，图标用 assets/bottom tab bar icon 里的真实素材。
+     容器本身贴到 .phone 最底部（bottom:0），胶囊条和圆按钮本身不贴边——它们和底部的间距
+     是 padding-bottom 留出来的（安全区 + 12px），不是容器没贴底 */
   .tab-bar{
     position:absolute;left:0;right:0;bottom:0;z-index:20;
-    padding:10px var(--page-margin) calc(env(safe-area-inset-bottom, 0px) + 10px);
+    display:flex;align-items:center;gap:10px;
+    padding:0 var(--page-margin) calc(env(safe-area-inset-bottom, 0px) + 12px);
   }
-  .tab-bar img{width:100%;display:block}
+  .tab-bar-pill{
+    flex:1;display:flex;align-items:center;justify-content:space-around;
+    background:#fff;border-radius:34px;padding:8px 4px;
+    box-shadow:0 8px 24px rgba(20,22,30,.12);
+  }
+  .tb-item{
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    border:none;background:none;padding:8px 14px;border-radius:24px;
+    font-size:11px;color:#8a8d94;
+  }
+  .tb-item img{width:24px;height:24px;display:block}
+  .tb-item.active{background:#E3EFFC;color:#0088E3}
+  .tab-bar-logo{
+    flex:0 0 auto;width:56px;height:56px;border-radius:50%;border:none;
+    background:#fff;box-shadow:0 8px 24px rgba(20,22,30,.12);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .tab-bar-logo img{width:32px;height:32px;display:block}
 
   .hint{text-align:center;font-size:12px;color:#a8abb3;max-width:340px}
 
@@ -286,9 +306,22 @@
         </div>
       </div>
 
-      <!-- 占位版：先用截图整图顶替，真实交互版等 SVG 素材到位后再换成逐项按钮 -->
       <div class="tab-bar" id="tabBar">
-        <img src="assets/tab-bar-placeholder@2x.png" alt="">
+        <div class="tab-bar-pill">
+          <button class="tb-item active" data-tb-on="assets/bottom tab bar icon/Home.svg" data-tb-off="assets/bottom tab bar icon/Home_unactivated.svg">
+            <img src="assets/bottom tab bar icon/Home.svg" alt=""><span>Home</span>
+          </button>
+          <button class="tb-item" data-tb-on="assets/bottom tab bar icon/camera.svg" data-tb-off="assets/bottom tab bar icon/Camera_unactivated.svg">
+            <img src="assets/bottom tab bar icon/Camera_unactivated.svg" alt=""><span>Cameras</span>
+          </button>
+          <button class="tb-item" data-tb-on="assets/bottom tab bar icon/smart.svg" data-tb-off="assets/bottom tab bar icon/smart_unactivated.svg">
+            <img src="assets/bottom tab bar icon/smart_unactivated.svg" alt=""><span>Smart</span>
+          </button>
+          <button class="tb-item" data-tb-on="assets/bottom tab bar icon/shop.svg" data-tb-off="assets/bottom tab bar icon/shop_unactivated.svg">
+            <img src="assets/bottom tab bar icon/shop_unactivated.svg" alt=""><span>Shop</span>
+          </button>
+        </div>
+        <button class="tab-bar-logo"><img src="assets/bottom tab bar icon/AI logo.svg" alt=""></button>
       </div>
     </div>
   </div>
@@ -312,6 +345,18 @@
     phoneEl.style.setProperty('--tabbar-h', tabBarEl.offsetHeight + 'px');
   }
   syncTabBarHeight();
+
+  // 底部 Tab 页签：纯视觉占位，点击只切换高亮态和图标，不做真实页面跳转
+  tabBarEl.querySelectorAll('.tb-item').forEach(function(item){
+    item.addEventListener('click', function(){
+      tabBarEl.querySelectorAll('.tb-item').forEach(function(other){
+        other.classList.remove('active');
+        other.querySelector('img').src = other.dataset.tbOff;
+      });
+      item.classList.add('active');
+      item.querySelector('img').src = item.dataset.tbOn;
+    });
+  });
 
   // 占位设备数据：真实接口数据到了再替换，分类/收藏关系先按这个跑通 tab+pager 联动。
   // room/icon/on/percent/isNew/shared/secondary 这几个字段只给 All Devices 的房间分组视图用，

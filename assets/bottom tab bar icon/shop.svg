@@ -1,0 +1,9 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<path d="M8 6C8 3.79086 9.79086 2 12 2C14.2091 2 16 3.79086 16 6" stroke-width="1.5" stroke="#0088E3"/>
+<use xlink:href="#stroke0_13783_10614" fill="white"/>
+<use xlink:href="#stroke0_13783_10614" fill="#0088E3" fill-opacity="0.6"/>
+<path d="M16 10C16 12.2091 14.2091 14 12 14C9.79086 14 8 12.2091 8 10" stroke-width="1.5" stroke-linecap="round" stroke="#0088E3"/>
+<defs>
+<path id="stroke0_13783_10614" d="M4.67845 7.60777C4.86542 6.67292 5.68625 6 6.63961 6H17.3604C18.3138 6 19.1346 6.67292 19.3216 7.60777L20.8039 15.0194C21.4227 18.1134 19.0562 21 15.901 21H8.09902C4.94379 21 2.57732 18.1134 3.19612 15.0194L4.67845 7.60777Z"/>
+</defs>
+</svg>
