@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Batch Control 切换 Demo · 框架草稿</title>
@@ -418,38 +418,6 @@
     phoneEl.style.setProperty('--tabbar-h', tabBarEl.offsetHeight + 'px');
   }
   syncTabBarHeight();
-
-  // 临时诊断：两次凭经验盲改（JS 测量视口高度）都和真机实际效果对不上，一次不够、
-  // 一次更差，现在这版纯 CSS fixed 定位依旧有空白——说明不能再猜了，加个角标把关键
-  // 视口数值实时显示出来，真机上读到具体数字之后才能知道到底是哪个值不对。
-  // 确认问题根因、修好之后这段连同这个函数一起删掉
-  (function(){
-    var hud = document.createElement('div');
-    hud.style.cssText = 'position:fixed;left:4px;top:4px;z-index:99999;font:10px/1.4 monospace;'
-      + 'color:#0f0;background:rgba(0,0,0,.65);padding:4px 6px;border-radius:4px;pointer-events:none;white-space:pre;';
-    document.body.appendChild(hud);
-    function render(){
-      var vv = window.visualViewport;
-      var pr = phoneEl.getBoundingClientRect();
-      var tr = tabBarEl.getBoundingClientRect();
-      hud.textContent =
-        'standalone:' + (window.navigator.standalone === true) + '\n' +
-        'innerH:' + window.innerHeight + '\n' +
-        'clientH:' + document.documentElement.clientHeight + '\n' +
-        'vvH:' + (vv ? vv.height.toFixed(1) : 'n/a') + '\n' +
-        'vvOffsetTop:' + (vv ? vv.offsetTop.toFixed(1) : 'n/a') + '\n' +
-        'screenH:' + window.screen.height + '\n' +
-        'phoneRectH:' + Math.round(pr.height) + '\n' +
-        'tabBarBottom:' + Math.round(tr.bottom);
-    }
-    render();
-    window.addEventListener('resize', render);
-    window.addEventListener('orientationchange', render);
-    window.addEventListener('pageshow', render);
-    document.addEventListener('visibilitychange', render);
-    if(window.visualViewport) window.visualViewport.addEventListener('resize', render);
-    [300, 800, 1500, 3000].forEach(function(ms){ setTimeout(render, ms); });
-  })();
 
   // 底部 Tab 页签：纯视觉占位，点击只切换高亮态和图标，不做真实页面跳转
   tabBarEl.querySelectorAll('.tb-item').forEach(function(item){
