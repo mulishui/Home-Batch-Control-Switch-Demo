@@ -85,18 +85,20 @@
     background:rgba(255,255,255,.55);display:flex;align-items:center;gap:8px;
   }
 
-  /* 头部背景：最底层、常显的背景，和 header-fade-bg（跟随滚动淡入淡出的渐变叠加层）
-     是两个独立的东西——它不跟随滚动进度变化，一直是完全可见的，所以这里不写 opacity，
-     也不在 JS 里改它的 opacity。原先用的是一张本身自带虚焦/磨砂质感的素材图
-     （assets/header-bg@2x.png），真机上贴着状态栏看就是一片"糊"的，所以换成纯色渐变——
-     颜色沿用 header-fade-bg 同一套配色（AECDED→C2D9F0），保证吸顶前后色调一致，
-     但不再有任何模糊观感。position:fixed 定位基准同样是 .phone（见上面 .phone 的
-     transform），不随列表滚动产生位移。高度保留原素材的设计高度 364px，不是靠猜的占位数字。
+  /* 头部背景图（assets/header-bg@2x.png）：最底层、常显的背景，和 header-fade-bg
+     （跟随滚动淡入淡出的渐变叠加层）是两个独立的东西——它不跟随滚动进度变化，
+     一直是完全可见的，所以这里不写 opacity，也不在 JS 里改它的 opacity。
+     position:fixed 定位基准同样是 .phone（见上面 .phone 的 transform），不随
+     列表滚动产生位移。宽度 100% 自动填满，高度写死成素材本身的设计高度（图片
+     @2x 导出，728px / 2 = 364px），这是真实资源的固有尺寸，不是靠猜的占位数字。
      z-index 给全场最低的 2，保证它在 page-title/banner（3）和 header-fade-bg（4）
-     之下，是名副其实的最底层。 */
+     之下，是名副其实的最底层。
+     （之前一度怀疑这张图自带的虚焦质感是"顶部模糊"的来源换成纯色渐变试过，但真机上
+     状态栏那圈模糊其实是 iOS 系统自带的状态栏/标题栏毛玻璃效果，不是这张图或本页面
+     CSS 画出来的，页面代码改不动，所以换回原图。） */
   .header-bg{
     position:fixed;top:0;left:0;right:0;z-index:2;height:364px;
-    background:linear-gradient(to bottom, #AECDED 0%, #C2D9F0 86%, #C2D9F0 100%);
+    background:url(assets/header-bg@2x.png) top/100% auto no-repeat;
     pointer-events:none;
   }
 
@@ -375,6 +377,7 @@
   var pager = document.getElementById('pager');
   var pagerTrack = document.getElementById('pagerTrack');
   var phoneEl = document.querySelector('.phone');
+  var stageEl = document.querySelector('.stage');
   var tabBarEl = document.getElementById('tabBar');
   var topBar = document.getElementById('topBar');
   var screenEl = document.getElementById('screen');
@@ -391,10 +394,15 @@
       // 不准的视口快照），底部就会空出一条真实设备截不到、页面也填不满的空白。改成 JS
       // 实测 visualViewport.height（比 window.innerHeight 更贴近真实可视区域，地址栏/
       // 系统手势条收起展开时也会实时更新）写成 inline 高度，不依赖 dvh 这个值本身准不准。
+      // .stage 也必须跟着设成同一个值，而不是只改 .phone：.stage/.stage-fit/.phone-wrap
+      // 这条外层链路原来还是 CSS 的 100dvh，一旦它比 .phone 量出来的 vh 大，.phone 在
+      // flex 列里是 flex-start 对齐，会贴顶留在上面，差出来的高度就变成 .phone 下方、
+      // .phone-wrap 内部的一截空白——.phone 自己再准也挡不住外层撑高。
       var vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
       phoneEl.style.width = '100%';
       phoneEl.style.height = vh + 'px';
       phoneEl.style.setProperty('--screen-h', vh + 'px');
+      stageEl.style.height = vh + 'px';
       return;
     }
     var availH = window.innerHeight - 96;
