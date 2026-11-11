@@ -19,20 +19,21 @@
 
   .phone-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;flex:0 0 auto}
 
-  /* 手机尺寸按 iPhone 17 Pro 逻辑分辨率模拟（402 x 874pt），素材按 @2x 导出 */
+  /* 手机尺寸桌面预览下不再写死某个具体机型的像素值，由 JS 按当前浏览器窗口大小算出来
+     （保持手机的宽高比），见下方 sizePhone()；宽高和 --screen-h 都是 JS 写进来的 inline 值，
+     这里不设默认值，移动端走下方 media query 的 100dvh */
   .phone{
-    width:402px;height:874px;border-radius:55px;background:#f5f7fa;
+    border-radius:55px;background:#f5f7fa;
     box-shadow:0 18px 44px rgba(20,22,30,.16),0 0 0 9px #1c1d21,0 0 0 10px #35373f;
     overflow:hidden;position:relative;
     /* 给 position:fixed 的子元素（header-fade-bg）建立一个定位基准：不加这个，fixed 元素会
        以外层桌面预览缩放容器 #stageFit（甚至是真实视口）为基准，宽度/位置就对不上手机屏幕了 */
     transform:translateZ(0);
     user-select:none;-webkit-user-select:none;
-    /* 顶部安全区：加到主屏幕独立运行时用真实 env()，桌面预览时退回模拟的 59px（iPhone 17 Pro 灵动岛高度） */
+    /* 顶部安全区：加到主屏幕独立运行时用真实 env()，桌面预览时退回模拟值 59px */
     --safe-top:max(59px, env(safe-area-inset-top, 0px));
     --topbar-h:calc(var(--safe-top) + 64px);
     --page-margin:16px;
-    --screen-h:874px; /* .screen 的实际高度：桌面预览是固定 874px，移动端用 100dvh 覆盖（见下方 media query） */
     --tabrow-h:68px; /* .tab-pill 高度 48px + .tab-row 上下 padding 各 10px */
     --shortcutrow-h:72px; /* .shortcut-row img 高度 64px + 上 6px/下 2px padding */
   }
@@ -245,7 +246,14 @@
     border:none;background:none;border-radius:29px;
     font-size:11px;color:#8a8d94;
   }
-  .tb-item img{width:22px;height:22px;display:block}
+  /* 选中态图标颜色切换不要用 JS 改 img.src——那是换一张图片资源，首次加载要等解码，
+     会有肉眼可见的延迟。两张图标都提前铺在 DOM 里（页面加载时就一起下载解码好了），
+     切 active 类只是切 CSS opacity，纯样式计算，没有任何资源加载环节 */
+  .tb-icon{position:relative;width:22px;height:22px;display:block}
+  .tb-icon img{position:absolute;inset:0;width:22px;height:22px;display:block}
+  .tb-icon-on{opacity:0}
+  .tb-item.active .tb-icon-on{opacity:1}
+  .tb-item.active .tb-icon-off{opacity:0}
   .tb-item.active{background:#E3EFFC;color:#0088E3}
   .tab-bar-logo{
     flex:0 0 auto;width:64px;height:64px;border-radius:50%;border:none;
@@ -253,6 +261,20 @@
     display:flex;align-items:center;justify-content:center;
   }
   .tab-bar-logo img{width:32px;height:32px;display:block}
+
+  /* tab-bar 下面的渐变衬底：列表卡片滚到底部、从胶囊条的圆角缝隙里露出来时，
+     不要让卡片硬生生地在缝隙里被截断——用一层和页面底色同色（F5F7FA）的渐变，
+     从透明过渡到实色，把卡片"接"到底色上再被胶囊条盖住。参数照 Figma：
+     纵向渐变，0% 处 0 透明度，50% 处到 100% 透明度（50%~100% 保持实色）。
+     高度跟着 .tab-bar 实测高度走（JS 量，见 syncTabBarHeight），不写死数字。
+     z-index 卡在列表内容（.screen 默认层）和 .tab-bar（20）之间，纯装饰，
+     不接受点击，不然会挡住它下面露出来的卡片点击区域 */
+  .tab-fade-bg{
+    position:absolute;left:0;right:0;bottom:0;z-index:15;
+    height:calc(var(--tabbar-h, 96px) + 24px);
+    background:linear-gradient(to bottom, rgba(245,247,250,0) 0%, #F5F7FA 50%, #F5F7FA 100%);
+    pointer-events:none;
+  }
 
   .hint{text-align:center;font-size:12px;color:#a8abb3;max-width:340px}
 
@@ -306,19 +328,36 @@
         </div>
       </div>
 
+      <div class="tab-fade-bg" id="tabFadeBg"></div>
       <div class="tab-bar" id="tabBar">
         <div class="tab-bar-pill">
-          <button class="tb-item active" data-tb-on="assets/bottom tab bar icon/Home.svg" data-tb-off="assets/bottom tab bar icon/Home_unactivated.svg">
-            <img src="assets/bottom tab bar icon/Home.svg" alt=""><span>Home</span>
+          <button class="tb-item active">
+            <span class="tb-icon">
+              <img class="tb-icon-off" src="assets/bottom tab bar icon/Home_unactivated.svg" alt="">
+              <img class="tb-icon-on" src="assets/bottom tab bar icon/Home.svg" alt="">
+            </span>
+            <span>Home</span>
           </button>
-          <button class="tb-item" data-tb-on="assets/bottom tab bar icon/camera.svg" data-tb-off="assets/bottom tab bar icon/Camera_unactivated.svg">
-            <img src="assets/bottom tab bar icon/Camera_unactivated.svg" alt=""><span>Cameras</span>
+          <button class="tb-item">
+            <span class="tb-icon">
+              <img class="tb-icon-off" src="assets/bottom tab bar icon/Camera_unactivated.svg" alt="">
+              <img class="tb-icon-on" src="assets/bottom tab bar icon/camera.svg" alt="">
+            </span>
+            <span>Cameras</span>
           </button>
-          <button class="tb-item" data-tb-on="assets/bottom tab bar icon/smart.svg" data-tb-off="assets/bottom tab bar icon/smart_unactivated.svg">
-            <img src="assets/bottom tab bar icon/smart_unactivated.svg" alt=""><span>Smart</span>
+          <button class="tb-item">
+            <span class="tb-icon">
+              <img class="tb-icon-off" src="assets/bottom tab bar icon/smart_unactivated.svg" alt="">
+              <img class="tb-icon-on" src="assets/bottom tab bar icon/smart.svg" alt="">
+            </span>
+            <span>Smart</span>
           </button>
-          <button class="tb-item" data-tb-on="assets/bottom tab bar icon/shop.svg" data-tb-off="assets/bottom tab bar icon/shop_unactivated.svg">
-            <img src="assets/bottom tab bar icon/shop_unactivated.svg" alt=""><span>Shop</span>
+          <button class="tb-item">
+            <span class="tb-icon">
+              <img class="tb-icon-off" src="assets/bottom tab bar icon/shop_unactivated.svg" alt="">
+              <img class="tb-icon-on" src="assets/bottom tab bar icon/shop.svg" alt="">
+            </span>
+            <span>Shop</span>
           </button>
         </div>
         <button class="tab-bar-logo"><img src="assets/bottom tab bar icon/AI logo.svg" alt=""></button>
@@ -339,6 +378,25 @@
   var headerFadeBg = document.getElementById('headerFadeBg');
   var CATS = Array.prototype.map.call(tabRow.querySelectorAll('.tab-pill'), function(b){ return b.dataset.cat; });
 
+  // 桌面预览下手机框的宽高不再写死某个机型的像素值，按当前浏览器窗口能给多少空间现算，
+  // 只保留手机常见的宽高比让它看起来还是个"手机"；移动端走 CSS media query 的 100dvh，这里直接跳过
+  var PHONE_ASPECT = 402 / 874;
+  function sizePhone(){
+    if(window.matchMedia('(max-width:600px)').matches){
+      phoneEl.style.width = '';
+      phoneEl.style.height = '';
+      phoneEl.style.removeProperty('--screen-h');
+      return;
+    }
+    var availH = window.innerHeight - 96;
+    var h = Math.max(600, Math.min(900, availH));
+    var w = Math.round(h * PHONE_ASPECT);
+    phoneEl.style.width = w + 'px';
+    phoneEl.style.height = h + 'px';
+    phoneEl.style.setProperty('--screen-h', h + 'px');
+  }
+  sizePhone();
+
   // device-grid/empty-state 底部要留多少空间才不会被吸底的 .tab-bar 挡住，直接量它的真实渲染高度，
   // 不猜固定值——换真实图标导致 tab-bar 变高变矮时，这里自动跟着对，不用去改别处的数字
   function syncTabBarHeight(){
@@ -351,10 +409,8 @@
     item.addEventListener('click', function(){
       tabBarEl.querySelectorAll('.tb-item').forEach(function(other){
         other.classList.remove('active');
-        other.querySelector('img').src = other.dataset.tbOff;
       });
       item.classList.add('active');
-      item.querySelector('img').src = item.dataset.tbOn;
     });
   });
 
@@ -539,6 +595,7 @@
   });
 
   window.addEventListener('resize', function(){
+    sizePhone();
     if(!pagerAnimating) applyTransform(-pagerIdx * pager.clientWidth, false);
     syncTabBarHeight();
     syncPagerHeight();
