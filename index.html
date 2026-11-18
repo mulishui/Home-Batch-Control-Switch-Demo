@@ -649,14 +649,25 @@
   screenEl.addEventListener('scroll', updateFadeOpacity, {passive:true});
 
   // 拖拽/触摸：跟手滑动，松手按位移量+速度判定翻不翻页，和常见 banner 轮播一个套路
-  var dragging = false, dragStartX = 0, dragStartTime = 0, dragBaseX = 0, dragDeltaX = 0;
+  var dragging = false, dragStartX = 0, dragStartY = 0, dragStartTime = 0, dragBaseX = 0, dragDeltaX = 0;
+  // 手势方向还没判定出来之前（axisLocked=false）不能确定这是翻页还是纵向滚动列表——
+  // All Devices 分组后内容比一屏高，用户纵向拖拽列表的手指按下点也落在 .pager 范围内，
+  // 如果像以前那样一按下就 setPointerCapture + 每次 pointermove 都 preventDefault，
+  // 会把本该交给 .screen 原生滚动的纵向手势也一起拦住，导致列表永远拖不到底。
+  // 改成先攒够 AXIS_LOCK_THRESHOLD 的位移再判定横向/纵向：横向就按原逻辑接管做翻页，
+  // 纵向就直接放弃这次手势（不 preventDefault、不 setPointerCapture），把手势还给原生滚动。
+  var axisLocked = false, isHorizontalDrag = false;
+  var AXIS_LOCK_THRESHOLD = 6;
   var DRAG_RATIO_THRESHOLD = 0.22; // 滑过 22% 页宽就当作一次有效翻页
   var DRAG_VELOCITY_THRESHOLD = 0.5; // px/ms，快速一甩也算有效翻页
 
-  function dragStart(x){
+  function dragStart(x, y){
     if(pagerAnimating) return;
     dragging = true;
+    axisLocked = false;
+    isHorizontalDrag = false;
     dragStartX = x;
+    dragStartY = y;
     dragStartTime = Date.now();
     dragBaseX = -pagerIdx * pager.clientWidth;
     dragDeltaX = 0;
@@ -672,6 +683,7 @@
   function dragEnd(){
     if(!dragging) return;
     dragging = false;
+    if(!isHorizontalDrag) return; // 判定成纵向滚动、已经让原生滚动接管的手势，松手不走翻页判定
     var elapsed = Math.max(1, Date.now() - dragStartTime);
     var velocity = Math.abs(dragDeltaX) / elapsed;
     var ratio = Math.abs(dragDeltaX) / pager.clientWidth;
@@ -686,11 +698,22 @@
   }
 
   pager.addEventListener('pointerdown', function(e){
-    dragStart(e.clientX);
-    pager.setPointerCapture(e.pointerId);
+    dragStart(e.clientX, e.clientY);
   });
   pager.addEventListener('pointermove', function(e){
     if(!dragging) return;
+    if(!axisLocked){
+      var dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+      if(Math.abs(dx) < AXIS_LOCK_THRESHOLD && Math.abs(dy) < AXIS_LOCK_THRESHOLD) return;
+      axisLocked = true;
+      isHorizontalDrag = Math.abs(dx) > Math.abs(dy);
+      if(isHorizontalDrag){
+        pager.setPointerCapture(e.pointerId);
+      } else {
+        dragging = false;
+        return;
+      }
+    }
     e.preventDefault();
     dragMove(e.clientX);
   });
