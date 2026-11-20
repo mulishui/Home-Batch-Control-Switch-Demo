@@ -206,7 +206,16 @@
   /* All Devices 房间分组：标题行 + 自己的一组 device-grid，多组纵向堆叠 */
   .room-section .device-grid{padding:0 var(--page-margin)}
   .room-section:first-of-type .room-header{padding-top:14px}
-  .room-section:last-of-type .device-grid{padding-bottom:16px}
+  /* 这里不能照抄上面 .device-grid 的 16px——那条规则能用固定小间距是因为配合
+     .pager-page > .device-grid 的 min-height，内容本来就被撑到正好一屏，最后一张
+     卡片原本就贴着屏幕底边，底下留给 tab-bar 盖的那段本来就是"视觉上多出来的"。
+     但 .room-section 的 device-grid 被显式排除在那条 min-height 规则外（见上面注释），
+     三组加起来的真实内容高度本来就会超出一屏，滚到底时最后一组卡片的底边就是真实
+     scrollHeight 的边界——如果只留 16px，最后一行卡片会被 .tab-fade-bg/.tab-bar 整段
+     盖住，而且已经滚到头，没有多余的滚动空间能把它们"拖"到悬浮条上方，看起来就是
+     列表拖不到底。所以这里要按 --tabbar-h 实测高度留出真正的空间，滚到底时最后一行
+     卡片能完全露到悬浮条上方，之前被盖住的只是这段特意留出来的空白 */
+  .room-section:last-of-type .device-grid{padding-bottom:calc(var(--tabbar-h, 96px) + 16px)}
   .room-header{
     display:flex;align-items:center;gap:4px;padding:18px var(--page-margin) 10px;
     font-size:17px;font-weight:600;color:#1D2529;
